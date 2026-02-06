@@ -1,9 +1,4 @@
 # BLIM.PY
-
-![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)
-![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-green)
-![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-yellow)
-
 ### Distraction-Free Writer for Google Blogger
 
 BLIM.PY is a terminal-based, minimalist writing environment designed for authors who want to publish to Google Blogger without the distractions of a web browser. It features a centered UI, real-time word counting, and a post management system.
