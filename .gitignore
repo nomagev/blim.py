@@ -1,0 +1,22 @@
+# Google API Files (Crucial for security)
+client_secrets.json
+token.json
+
+# Local Configuration
+config.json
+
+# Python environment/cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+
+# Recovery file
+.recovery_blim.tmp
+
+# System files
+.DS_Store
+Thumbs.db
