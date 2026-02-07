@@ -317,7 +317,7 @@ class BlimEditor:
     def save_post(self, is_draft=True):
         if self.is_offline or not self.service:
             self.last_spell_report = "SAVE FAILED: Offline"
-            return
+            return False # Early exit if we can't save
 
         # 1. Start with the raw text from the body
         md = self.body_field.text
@@ -358,6 +358,7 @@ class BlimEditor:
             self.last_spell_report = "Saved with Markdown!"
         except Exception as e:
             self.last_spell_report = f"Save Error: {str(e)[:20]}"
+            return False # Return False if saving failed
 
     def setup_bindings(self):
         @self.kb.add('f1')

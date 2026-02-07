@@ -14,6 +14,9 @@ env/
 venv/
 .env
 
+# Logs
+*.log
+
 # Recovery file
 .recovery_blim.tmp
 
