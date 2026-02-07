@@ -2,6 +2,7 @@
 # Copyright (C) 2026 Nomagev
 
 from email.mime import text
+from pydoc import html
 import os, sys, time, json, re, asyncio
 from prompt_toolkit import Application
 from prompt_toolkit.enums import EditingMode
@@ -338,7 +339,9 @@ class BlimEditor:
 
         # 3. Paragraph Handling
         # Convert double newlines to <p> tags and single newlines to <br />
-        content_html = f"<p>{html.replace('\n\n', '</p><p>').replace('\n', '<br />')}</p>"
+        # NEW (Safe for all Python versions)
+        formatted_body = html.replace('\n\n', '</p><p>').replace('\n', '<br />')
+        content_html = f"<p>{formatted_body}</p>"
 
         # 4. Blogger API Upload
         labels_list = [t.strip() for t in self.tags_field.text.split(',') if t.strip()]
