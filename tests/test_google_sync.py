@@ -4,33 +4,31 @@ from blim import BlimEditor  # This imports your class
 
 @patch('blim.build')
 def test_save_post_success(mock_build):
-    # 1. SETUP THE FAKE API (Modified for reliability)
+    # 1. SETUP
     mock_service = MagicMock()
     mock_build.return_value = mock_service
-    
-    # We grab the 'posts' level
     mock_posts = mock_service.posts.return_value
     
-    # We ensure both 'insert' and 'update' return a mock that has an 'execute' method
+    # Ensure execute() returns a dictionary
     mock_posts.insert.return_value.execute.return_value = {'id': '12345'}
     mock_posts.update.return_value.execute.return_value = {'id': '12345'}
 
-    # 2. INITIALIZE YOUR CLASS
+    # 2. INITIALIZE & FORCE STATE
     editor = BlimEditor()
+    editor.is_offline = False  # Force online
+    editor.service = mock_service # Force the mock service into the editor
+    
     editor.body_field.text = "This is a **test** post."
     editor.title_field.text = "Test Title"
-    editor.tags_field.text = "test, blim"
     editor.blog_id = "123"
-    editor.current_post_id = None # Force it to use 'insert'
+    editor.current_post_id = None 
     
-    # 3. RUN YOUR ACTUAL METHOD
+    # 3. ACTION
     editor.save_post()
 
-    # 4. ASSERTIONS (Modified to check for either action)
-    # We check the 'posts' mock to see if its children were called
-    api_was_called = mock_posts.insert.called or mock_posts.update.called
-    assert api_was_called, "Blogger API was never reached!"
-    
+    # 4. ASSERTIONS
+    # We check if the 'insert' method on our mock was called
+    assert mock_posts.insert.called, "The code never called the insert method!"
     assert "Saved" in editor.last_spell_report
 
 @patch('blim.build')
