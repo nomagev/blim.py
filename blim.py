@@ -315,35 +315,63 @@ class BlimEditor:
         # 3. Final strip (Removes remaining tags but preserves images as per your original)
         return re.sub(r'<(?!img|/img)[^>]+>', '', text).strip()
 
-    def save_post(self, is_draft=True):
-        if self.is_offline or not self.service:
-            self.last_spell_report = "SAVE FAILED: Offline"
-            return False # Early exit if we can't save
+    def _parse_markdown(self, md_text):
+        html = md_text
+        
+        # 1. Blockquotes (> Quote)
+        html = re.sub(r'^> (.*?)$', r'<blockquote>\1</blockquote>', html, flags=re.M)
+        
+        # 2. Horizontal Rule (---)
+        html = re.sub(r'^---$', r'<hr />', html, flags=re.M)
 
-        # 1. Start with the raw text from the body
-        md = self.body_field.text
-
-        # 2. LIGHTWEIGHT MARKDOWN PARSING (Regex)
-        html = md
-        # Headers (### Title -> <h3>Title</h3>)
+        # 3. Headers
         html = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html, flags=re.M)
         html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.M)
         html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.M)
-        
-        # Bold (**text**) and Italics (*text*)
+
+        # 4. Unordered Lists
+        html = re.sub(r'^\* (.*?)$', r'<li>\1</li>', html, flags=re.M)
+        # Wrap consecutive <li> tags in <ul>
+        html = re.sub(r'((?:<li>.*?</li>\n?)+)', r'<ul>\1</ul>', html, flags=re.S)
+
+        # 5. Inline Elements
         html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', html)
         html = re.sub(r'\*(.*?)\*', r'<i>\1</i>', html)
-        
-        # Links ([text](url) -> <a href="url">text</a>)
         html = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', html)
 
-        # 3. Paragraph Handling
-        # Convert double newlines to <p> tags and single newlines to <br />
-        # NEW (Safe for all Python versions)
-        formatted_body = html.replace('\n\n', '</p><p>').replace('\n', '<br />')
-        content_html = f"<p>{formatted_body}</p>"
+        # 6. SMARTER FINAL CLEANUP (Normalized Version)
+        blocks = html.split('\n\n')
+        processed_blocks = []
+        
+        for block in blocks:
+            trimmed = block.strip()
+            if not trimmed:
+                continue
 
-        # 4. Blogger API Upload
+            # Check if it starts with an HTML block tag
+            if trimmed.startswith('<'):
+                # IMPROVEMENT: Use .strip() to clean ends, but keep internal structure
+                # We only remove internal newlines if it's a list to keep it tight
+                if '<li>' in trimmed:
+                    processed_blocks.append(trimmed.replace('\n', ''))
+                else:
+                    processed_blocks.append(trimmed)
+            else:
+                # Standard paragraph text
+                formatted = trimmed.replace('\n', '<br />')
+                processed_blocks.append(f"<p>{formatted}</p>")
+
+        return "".join(processed_blocks)
+
+    def save_post(self, is_draft=True):
+        if self.is_offline or not self.service:
+            self.last_spell_report = "SAVE FAILED: Offline"
+            return False
+
+        # 1. Logic Delegation: Let the new method handle the HTML
+        content_html = self._parse_markdown(self.body_field.text)
+
+        # 2. Blogger API Prep
         labels_list = [t.strip() for t in self.tags_field.text.split(',') if t.strip()]
         body = {"title": self.title_field.text, "content": content_html, "labels": labels_list}
         
@@ -361,12 +389,12 @@ class BlimEditor:
             self.last_spell_report = "Saved with Markdown!"
         except Exception as e:
             self.last_spell_report = f"Save Error: {str(e)[:20]}"
-            return False # Return False if saving failed
+            return False
 
     def setup_bindings(self):
         @self.kb.add('f1')
         def _(event): self.show_help = not self.show_help; self.show_browser = False
-        @self.kb.add('c-l')
+        @self.kb.add('c-o')
         def _(event): self.show_browser = not self.show_browser; self.show_help = False; self.fetch_recent_posts()
         @self.kb.add('tab')
         def _(event): event.app.layout.focus_next()
@@ -419,6 +447,43 @@ class BlimEditor:
         @self.kb.add('enter', filter=Condition(lambda: self.show_browser))
         def _(event): 
             if self.posts_list: self.fetch_and_load(self.posts_list[self.browser_index]['id']); self.show_browser = False; get_app().layout.focus(self.body_field)
+        @self.kb.add('c-q')  # Ctrl + Q for Blockquote
+        def _toggle_quote(event):
+            buffer = event.app.current_buffer
+            doc = buffer.document
+            selection = doc.selection_range()
+            
+            if selection:
+                text = buffer.copy_selection().text
+                # Wrap the selected text in a blockquote symbol
+                buffer.insert_text(f"> {text}", overwrite=True)
+            else:
+                # If nothing is selected, just put the symbol at the start of the line
+                buffer.insert_text("> ")
+
+        @self.kb.add('c-l')
+        def _(event):
+            buffer = self.body_field.buffer
+            if buffer.selection_state:
+                # 1. Get exact coordinates
+                start, end = buffer.document.selection_range()
+                selected_text = buffer.document.text[start:end]
+                
+                # 2. Format the lines
+                lines = selected_text.splitlines()
+                new_list = "\n".join([f"* {line.strip()}" for line in lines if line.strip()])
+                
+                # 3. DIRECT TEXT REPLACEMENT (Bypasses the "Ghosting" bug)
+                # We rebuild the entire document string
+                before = buffer.document.text[:start]
+                after = buffer.document.text[end:]
+                buffer.text = before + new_list + after
+                
+                # 4. RESET STATE
+                buffer.cursor_position = start + len(new_list)
+                buffer.exit_selection()
+            else:
+                buffer.insert_text("* ")
 
     def start_sprint(self, mins):
         self.sprint_time_left = int(mins) * 60

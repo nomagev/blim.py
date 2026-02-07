@@ -28,7 +28,7 @@ Blim.py uses a **Hybrid TUI** (Text User Interface) that supports both keyboard 
 | :--- | :--- | :--- |
 | **Switch Focus** | `Ctrl + W` | Click into any field |
 | **Command Bar** | `Ctrl + G` | Click bottom bar |
-| **Open Browser** | `Ctrl + L` | Click "Post Browser" in Help |
+| **Open Browser** | `Ctrl + O` | Click "Post Browser" in Help |
 | **Toggle Help** | `F1` | — |
 
 ---
@@ -46,6 +46,10 @@ Commands are entered in the **Command Bar** (bottom) starting with a colon `:`.
 ---
 
 ## ✍️ Writing Features
+
+### Markdown Support
+You can use Markdown notation to format your texts and blim.py will transform it onto html automatically. 
+> **Tip:** you can select the text and apply bold (ctrl + b), italics (ctrl +k), create lists (ctrl + l), blockquote (ctrl + q) and enter links [url](friendly name).
 
 ### Word Sprint Mode
 Designed for the Pomodoro technique. When active, a live timer appears in the status bar. 

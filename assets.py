@@ -22,7 +22,7 @@ HELP_TEXT = {
     [F1] or [:help]  › Toggle this Manual
     [TAB] / [S-TAB]  › Cycle focus (Title / Tags / Body)
     [Ctrl+G]         › Jump to Command Bar
-    [Ctrl+L]         › Open Post Browser (Fetch Drafts & Live)
+    [Ctrl+O]         › Open Post Browser (Fetch Drafts & Live)
 
   ◆ WRITING & PRODUCTIVITY
     ────────────────────────────────────────────────────────────────────
@@ -42,8 +42,11 @@ HELP_TEXT = {
     ────────────────────────────────────────────────────────────────────
     [Ctrl+B]         › **Bold**
     [Ctrl+K]         › *Italic*
+    [Control+L]      › Insert List Item
+    [Control+Q]      › Blockquote 
     Headers          › # H1, ## H2, ### H3
     Links            › [Text](url)
+
 ────────────────────────────────────────────────────────────────────────
  [Press F1 to Resume Writing]
 """,
@@ -57,7 +60,7 @@ HELP_TEXT = {
     [F1] o [:help]   › Alternar este manual
     [TAB] / [S-TAB]  › Cambiar foco (Título / Etiquetas / Cuerpo)
     [Ctrl+G]         › Ir a Barra de Comandos
-    [Ctrl+L]         › Abrir Navegador (Cargar Borradores/Publicados)
+    [Ctrl+O]         › Abrir Navegador (Cargar Borradores/Publicados)
 
   ◆ ESCRITURA Y PRODUCTIVIDAD
     ────────────────────────────────────────────────────────────────────
@@ -77,6 +80,8 @@ HELP_TEXT = {
     ────────────────────────────────────────────────────────────────────
     [Ctrl+B]         › **Negrita**
     [Ctrl+K]         › *Cursiva*
+    [Control+L]      › Crear Elemento de Lista
+    [Control+Q]      › Citar Bloque
     Encabezados      › # T1, ## T2, ### T3
     Enlaces          › [Texto](url)
 ────────────────────────────────────────────────────────────────────────
