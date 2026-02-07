@@ -1,5 +1,8 @@
-prompt_toolkit
-google-api-python-client
-google-auth-oauthlib
+pytest
+pytest-mock
+prompt-toolkit
 pyspellchecker
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
 pygments

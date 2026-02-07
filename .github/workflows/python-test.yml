@@ -13,7 +13,7 @@ jobs:
         python-version: '3.10'
     - name: Install dependencies
       run: |
-        pip install pytest pytest-mock prompt-toolkit pyspellchecker
+        pip install -r requirements.txt
     - name: Run Tests
       run: |
         PYTHONPATH=. pytest
