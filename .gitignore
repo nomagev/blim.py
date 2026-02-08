@@ -17,6 +17,9 @@ venv/
 # Logs
 *.log
 
+# Backup files
+*.bak
+
 # Recovery file
 .recovery_blim.tmp
 
