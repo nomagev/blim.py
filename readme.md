@@ -9,6 +9,8 @@
 
 BLIM.PY is a terminal-based, minimalist writing environment designed for authors who want to publish to Google Blogger without the distractions of a web browser. It features a centered UI, real-time word counting, and a post management system.
 
+<img title="Blim.py on Cool Retro Term" alt="Blim.py ASCII art" src="/img/blimpy-on-CRT.png">
+
 ## Features
 - **Markdown Support**: Headers (#), Bold (**), Italics (*), Links, Lists, and Blockquotes.
 - **Smart HTML Parser**: Generates clean, Blogger-ready HTML without paragraph nesting bugs.
