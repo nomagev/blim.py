@@ -11,7 +11,12 @@ BLIM.PY is a terminal-based, minimalist writing environment designed for authors
 
 <img title="Blim.py on Cool Retro Term" alt="Blim.py ASCII art" src="/img/blimpy-on-CRT.png">
 
-## Features
+## New & Improved Features
+- **Multi-Language Support**: Full UI and spellcheck support for English (`:eng`) and Spanish (`:spa`).
+- **Word Sprints**: Set a timer for focused writing sessions using `:sprint NN`.
+- **Reading Time Estimation**: Real-time calculation of how long your post will take to read.
+- **Local Recovery**: Automatic background saving to `.recovery_blim.tmp` to prevent data loss.
+- **Ghost Mode**: Hide the entire UI while typing (`Ctrl+T`) to focus purely on the words.
 - **Markdown Support**: Headers (#), Bold (**), Italics (*), Links, Lists, and Blockquotes.
 - **Smart HTML Parser**: Generates clean, Blogger-ready HTML without paragraph nesting bugs.
 - **Post Browser**: Manage Live and Draft posts with a dedicated menu (`Ctrl+O`).
@@ -26,7 +31,7 @@ BLIM.PY is a terminal-based, minimalist writing environment designed for authors
 - `Ctrl + P`: Publish Live
 - `Ctrl + T`: Toggle Ghost Mode
 - `Ctrl + B`: Bold Selection
-- `Ctrl + I`: Italic Selection
+- `Ctrl + K`: Italic Selection
 - `Ctrl + L`: Create Unordered List
 - `Ctrl + Q`: Create Blockquote
 - `Ctrl + D`: Run Spellcheck
@@ -44,7 +49,7 @@ BLIM.PY is a terminal-based, minimalist writing environment designed for authors
    cd blim.py
 2. Install dependencies:
    ```bash
-   pip install prompt_toolkit pyspellchecker google-api-python-client google-auth-oauthlib
+   pip install prompt_toolkit pyspellchecker google-api-python-client google-auth-oauthlib markdown
 3. Place your client_secrets.json (from [Google Cloud Console](https://console.cloud.google.com/)) in the root folder.
 
    To use Blim, you must configure a project in the Google Cloud Console:

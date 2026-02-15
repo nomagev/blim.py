@@ -22,6 +22,7 @@ venv/
 
 # Recovery file
 .recovery_blim.tmp
+.blim_recovery.json
 
 # System files
 .DS_Store
