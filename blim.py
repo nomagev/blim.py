@@ -11,6 +11,8 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.widgets import TextArea, Label
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.lexers import PygmentsLexer
+from prompt_toolkit.lexers import Lexer
+from prompt_toolkit.document import Document
 from pygments.lexers.html import HtmlLexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.application import get_app
@@ -32,6 +34,52 @@ blim_style = Style.from_dict({
     'body': 'fg:#00ff00 bg:#000000',
     'reverse-header': 'reverse bold',
 })
+
+class SpellCheckLexer(Lexer):
+    def __init__(self, editor):
+        self.editor = editor
+
+    def lex_document(self, document: Document):
+        def get_line(lineno):
+            line_text = document.lines[lineno]
+            tokens = []
+            
+            # Use regex to find words (handling different languages)
+            # This looks for sequences of alphanumeric characters
+            for match in re.finditer(r"[\w']+", line_text):
+                word = match.group()
+                start, end = match.start(), match.end()
+                
+                # Add unstyled text before the word
+                if tokens:
+                    last_end = tokens[-1][0] # Not applicable for first token
+                
+                # Check spelling
+                is_correct = True
+                if self.editor.spell:
+                    # We check if the word is in the dictionary
+                    is_correct = self.editor.spell.known([word.lower()])
+                
+                # Choose style
+                style = '' if is_correct else 'class:spell-error'
+                
+                # prompt-toolkit expects a list of (style_string, text)
+                # We build the line piece by piece
+                # (This is a simplified logic for the example)
+            
+            # Optimized approach for prompt-toolkit:
+            words = re.split(r"([^\w']+)", line_text)
+            formatted_line = []
+            for piece in words:
+                if re.match(r"[\w']+", piece):
+                    is_known = self.editor.spell.known([piece.lower()]) if self.editor.spell else True
+                    style = 'class:spell-error' if not is_known else ''
+                    formatted_line.append((style, piece))
+                else:
+                    formatted_line.append(('', piece))
+            return formatted_line
+
+        return get_line
 
 class BlimEditor:
     def __init__(self):
@@ -107,9 +155,9 @@ class BlimEditor:
 
         # 2. UI Fields - PASS THE FUNCTION, NOT THE RESULT (No parentheses here)
         self.header_label = Label(text=get_header_text, style='class:reverse-header')
-        self.title_field = TextArea(height=1, prompt=get_title_prompt, multiline=False, focus_on_click=True)
+        self.title_field = TextArea(height=1, prompt=get_title_prompt, multiline=False, lexer=SpellCheckLexer(self), focus_on_click=True)
         self.tags_field = TextArea(height=1, prompt=get_tags_prompt, multiline=False, focus_on_click=True)
-        self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=PygmentsLexer(HtmlLexer), wrap_lines=True, focus_on_click=True)
+        self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=SpellCheckLexer(self), wrap_lines=True, focus_on_click=True)
         
         self.command_field = TextArea(height=1, prompt=get_command_prompt, style='class:prompt-normal', multiline=False, accept_handler=self.handle_normal_input, focus_on_click=True)
         self.warning_field = TextArea(height=1, prompt=get_warning_prompt, style='class:status-warn', multiline=False, accept_handler=self.handle_warning_input, focus_on_click=True)
