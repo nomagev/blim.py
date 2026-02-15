@@ -39,6 +39,7 @@ class BlimEditor:
         self._load_config()
         
         # --- State ---
+        self.lang = 'en'
         self.is_offline = False
         self.current_post_id = None
         self.post_status = "NEW"
@@ -56,8 +57,8 @@ class BlimEditor:
         self.sprint_time_left = 0
         self.ghost_mode_enabled = False 
         self.last_interaction_time = time.time()
-        self.ghost_timeout = 3 
-
+        self.ghost_timeout = 3
+        
         self.spell = SpellChecker(language=self.lang)
         self.service = self.authenticate()
         
@@ -73,6 +74,7 @@ class BlimEditor:
         self._init_layout()
         self.kb = KeyBindings()
         self.setup_bindings()
+        self.apply_language(self.lang)  # This will set up the spellchecker and translations
 
         if os.path.exists(self.recovery_path):
             self.last_spell_report = "RECOVERY FILE FOUND! Type :restore"
@@ -95,19 +97,30 @@ class BlimEditor:
             self.lang = config.get("language", "es")
 
     def _init_ui_components(self):
-        # Added focus_on_click=True to restore mouse support per field
-        self.title_field = TextArea(height=1, prompt='Title: ', multiline=False, focus_on_click=True)
-        self.tags_field = TextArea(height=1, prompt='Tags:  ', multiline=False, focus_on_click=True)
+        # 1. Functions for dynamic text lookup
+        def get_title_prompt(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["title"]
+        def get_tags_prompt(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["tags"]
+        def get_command_prompt(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["command"]
+        def get_header_text(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["header"]
+        def get_warning_prompt(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["warning_prompt"]
+        def get_fetching_prompt(): return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]["fetching"] + "\n"
+
+        # 2. UI Fields - PASS THE FUNCTION, NOT THE RESULT (No parentheses here)
+        self.header_label = Label(text=get_header_text, style='class:reverse-header')
+        self.title_field = TextArea(height=1, prompt=get_title_prompt, multiline=False, focus_on_click=True)
+        self.tags_field = TextArea(height=1, prompt=get_tags_prompt, multiline=False, focus_on_click=True)
         self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=PygmentsLexer(HtmlLexer), wrap_lines=True, focus_on_click=True)
-        self.command_field = TextArea(height=1, prompt='Enter Command: ', style='class:prompt-normal', multiline=False, accept_handler=self.handle_normal_input, focus_on_click=True)
-        self.warning_field = TextArea(height=1, prompt='UNSAVED! Proceed? (y/n): ', style='class:status-warn', multiline=False, accept_handler=self.handle_warning_input)
+        
+        self.command_field = TextArea(height=1, prompt=get_command_prompt, style='class:prompt-normal', multiline=False, accept_handler=self.handle_normal_input, focus_on_click=True)
+        self.warning_field = TextArea(height=1, prompt=get_warning_prompt, style='class:status-warn', multiline=False, accept_handler=self.handle_warning_input, focus_on_click=True)
+        
         help_content = HELP_TEXT.get(self.lang, HELP_TEXT["en"]).strip()
         self.help_field = TextArea(text=help_content, read_only=True, style='class:help-text')
-        self.browser_field = TextArea(text="Fetching posts...", read_only=True, style='class:help-text')
+        self.browser_field = TextArea(read_only=True, style='class:help-text')
 
     def _init_layout(self):
         # 1. We define the "Normal" bars
-        self.header_bar = VSplit([Window(), Label(text=" BLIM.PY | DISTRACTION-FREE WRITER ", style="class:reverse-header"), Window()], height=1)
+        self.header_bar = VSplit([Label(text=" v.1.0 ", style='class:reverse-header'), self.header_label, Label(text=" [F1] Help ", style='class:reverse-header'),], height=1)
         self.status_bar_view = VSplit([Window(), Label(text=self.get_status_text, style='class:status-bar'), Window()], height=1)
         self.command_view = VSplit([Window(), self.command_field, Window()], height=1)
         self.warning_view = VSplit([Window(), self.warning_field, Window()], height=1)
@@ -175,44 +188,95 @@ class BlimEditor:
 
     def get_status_text(self):
         from assets import TRANSLATIONS
-        t = TRANSLATIONS.get(self.lang, TRANSLATIONS["en"]) # Fallback to English
+        lang = getattr(self, 'lang', 'en')
+        t = TRANSLATIONS.get(lang, TRANSLATIONS['en'])['status']
         
-        dirty = "*" if self.is_dirty() else ""
-        words, read_min = self.calculate_stats()
+        dirty = " *" if self.is_dirty() else ""
+        words, read_min = self.get_reading_speed()
         
         # Using the dictionary for "DONE" and "Words/Palabras"
-        goal_label = t["done"] if words >= self.word_goal else f"{words}/{self.word_goal}"
+        goal_label = f"{t['words']}: {len(self.body_field.text.split())}"
         
         elapsed = int(time.time() - self.start_time)
         mins, secs = divmod(elapsed, 60)
         
-        sprint_label = f" | {t['sprint']}: {divmod(self.sprint_time_left, 60)[0]:02d}:{divmod(self.sprint_time_left, 60)[1]:02d}" if self.sprint_active else ""
-        
+        sprint_label = ""
+        mins, secs = 0, 0
+        if self.sprint_active:
+            sprint_label = f" | {t['sprint']}"
+            remaining = max(0, self.sprint_end - time.time())
+            mins, secs = divmod(int(remaining), 60)
+            if remaining == 0:
+                sprint_label = f" | {t['done']}!"
         return f" [{self.post_status}]{dirty} | {goal_label} | {t['read']}: {read_min}m{sprint_label} | {mins:02d}:{secs:02d} | {self.last_spell_report} "
-
+        
     def is_dirty(self): return self.body_field.text.strip() != self.last_saved_content.strip()
 
+    def apply_language(self, lang_code):
+        self.lang = lang_code
+        t = TRANSLATIONS[self.lang]["ui"]
+
+        # If we are in a 'New' state, update the label to the current language
+        if self.post_status in ["[NEW]", "[NUEVO]", "NEW"]:
+            self.post_status = t["new_post"]
+
+        # Update UI Prompts
+        self.header_label.text = t["header"]
+        self.title_field.prompt = t["title"]
+        self.tags_field.prompt = t["tags"]
+        self.command_field.prompt = t["command"]
+        self.warning_field.prompt = t["warning_prompt"]
+
+        # FORCE the internal renderer to see the change
+        self.title_field.control.prompt = t["title"]
+        self.tags_field.control.prompt = t["tags"]
+        self.command_field.control.prompt = t["command"]
+        self.warning_field.control.prompt = t["warning_prompt"]
+
+        if self.show_browser:
+            self.render_browser()
+
+        # Update Help Content and Spellchecker
+        self.help_field.text = HELP_TEXT.get(self.lang, HELP_TEXT["en"]).strip()
+        self.spell = SpellChecker(language=self.lang)
+
+        # Update Header (since it's inside a Label)
+        self.header_bar.children[1].content.text = TRANSLATIONS[self.lang]["ui"]["header"]
+        
+        self.last_spell_report = t["lang_feedback"]
+    
     def handle_normal_input(self, buffer):
         user_input = buffer.text.strip().lower()
         if not user_input:
             get_app().layout.focus(self.body_field)
             return
-        if user_input == ':new': self.start_new_post()
+
+        # Single command chain for better performance and reliability
+        if user_input == ':new': 
+            self.start_new_post()
+        elif user_input == ':spa':
+            self.apply_language('es')
+        elif user_input == ':eng':
+            self.apply_language('en')
         elif user_input in [':q', ':exit']:
-            if not self.is_dirty(): get_app().exit()
+            if not self.is_dirty:  # Note: is_dirty is a boolean, no () needed
+                get_app().exit()
             else:
                 self.is_warning_mode = True
                 self.pending_action = "quit"
                 get_app().layout.focus(self.warning_field)
         elif user_input == ':help':
             self.show_help, self.show_browser = True, False
-        elif user_input == ':restore': self.load_recovery()
+        elif user_input == ':restore': 
+            self.load_recovery()
         elif user_input.startswith(':sprint'):
             parts = user_input.split()
             self.start_sprint(parts[1] if len(parts) > 1 else 25)
         elif user_input.isdigit(): 
             self.fetch_and_load(user_input)
             get_app().layout.focus(self.body_field)
+            
+        # Clear the command buffer after execution
         buffer.text = ""
 
     def handle_warning_input(self, buffer):
@@ -226,10 +290,14 @@ class BlimEditor:
         buffer.text = ""
 
     def start_new_post(self):
-        if self.is_dirty():
-            self.is_warning_mode, self.pending_action = True, "new"
-            get_app().layout.focus(self.warning_field)
-        else: self._force_clear_all()
+        self.title_field.text = ""
+        self.body_field.text = ""
+        self.tags_field.text = ""
+        # Use the translation dictionary instead of "[NEW]"
+        self.post_status = TRANSLATIONS[self.lang]["ui"]["new_post"]
+        self.current_post_id = None
+        self.is_dirty = False
+        get_app().layout.focus(self.body_field)
 
     def _force_clear_all(self):
         self.current_post_id, self.post_status = None, "NEW"
@@ -255,13 +323,35 @@ class BlimEditor:
             self.browser_field.text = f"Fetch Error: {str(e)[:20]}"
 
     def render_browser(self):
+        t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]
+        
+        # 1. Start with the "Fetching" message and a real newline
+        header_msg = t["fetching"]
         width = 76
-        lines = [" ╔" + "═"*(width-2) + "╗", " ║  POST BROWSER" + " "*(width-17) + "║", " ╠" + "═"*(width-2) + "╣"]
+        
+        # 2. Build the box
+        lines = [header_msg] # First line is the text
+        lines.append(" ╔" + "═"*(width-2) + "╗")
+        
+        # Header line of the box
+        header_content = t["browser_title"].ljust(width-2)
+        lines.append(f" ║{header_content}║")
+        lines.append(" ╠" + "═"*(width-2) + "╣")
+        
+        # Posts
         for i, post in enumerate(self.posts_list):
             prefix = " › " if i == self.browser_index else "   "
-            lines.append(f" ║ {prefix}[{post['status'][0]}] {post['title'][:55]}".ljust(width) + "║")
-        while len(lines) < 18: lines.append(" ║".ljust(width) + "║")
+            display_title = post['title'][:60].ljust(60)
+            status_char = post['status'][0].upper()
+            content = f" {prefix}[{status_char}] {display_title}".ljust(width-2)
+            lines.append(f" ║{content}║")
+            
+        while len(lines) < 18: 
+            lines.append(" ║" + " "*(width-2) + "║")
+            
         lines.append(" ╚" + "═"*(width-2) + "╝")
+        
+        # 3. Join with actual newlines
         self.browser_field.text = "\n".join(lines)
 
     def fetch_and_load(self, post_id):
@@ -444,9 +534,12 @@ class BlimEditor:
         def _(event): self.browser_index = max(0, self.browser_index - 1); self.render_browser()
         @self.kb.add('down', filter=Condition(lambda: self.show_browser))
         def _(event): self.browser_index = min(len(self.posts_list)-1, self.browser_index + 1); self.render_browser()
-        @self.kb.add('enter', filter=Condition(lambda: self.show_browser))
+        @self.kb.add('enter', filter=Condition(lambda: self.show_browser and get_app().layout.has_focus(self.browser_field)))
         def _(event): 
-            if self.posts_list: self.fetch_and_load(self.posts_list[self.browser_index]['id']); self.show_browser = False; get_app().layout.focus(self.body_field)
+            if self.posts_list: 
+                self.fetch_and_load(self.posts_list[self.browser_index]['id'])
+                self.show_browser = False
+                get_app().layout.focus(self.body_field)
         @self.kb.add('c-q')  # Ctrl + Q for Blockquote
         def _toggle_quote(event):
             buffer = event.app.current_buffer
@@ -505,14 +598,12 @@ class BlimEditor:
                     net_gain = max(0, total_written)
                     self.last_spell_report = f"★ DONE! +{net_gain} words ★"
 
-    def get_reading_time(self):
-        text = self.body_field.text.strip()
-        if not text:
-            return 0
-        word_count = len(text.split())
-        # Average reading speed is ~225 WPM
+    def get_reading_speed(self):
+        word_count = len(self.body_field.text.split())
         minutes = word_count / 225
-        return round(minutes) if minutes >= 1 else "< 1"
+        read_time = round(minutes) if minutes >= 1 else "< 1"
+        return word_count, read_time
+    
     def auto_save_recovery(self):
         try:
             with open(self.recovery_path, 'w') as f: json.dump({"title": self.title_field.text, "body": self.body_field.text}, f)

@@ -23,6 +23,7 @@ HELP_TEXT = {
     [TAB] / [S-TAB]  › Cycle focus (Title / Tags / Body)
     [Ctrl+G]         › Jump to Command Bar
     [Ctrl+O]         › Open Post Browser (Fetch Drafts & Live)
+    [:eng] or [:spa] › Switch Language (English/Spanish)
 
   ◆ WRITING & PRODUCTIVITY
     ────────────────────────────────────────────────────────────────────
@@ -61,6 +62,7 @@ HELP_TEXT = {
     [TAB] / [S-TAB]  › Cambiar foco (Título / Etiquetas / Cuerpo)
     [Ctrl+G]         › Ir a Barra de Comandos
     [Ctrl+O]         › Abrir Navegador (Cargar Borradores/Publicados)
+    [:eng] o [:spa]  › Selecciona idioma (Inglés/Español)
 
   ◆ ESCRITURA Y PRODUCTIVIDAD
     ────────────────────────────────────────────────────────────────────
@@ -92,18 +94,71 @@ HELP_TEXT = {
 # Dictionary for UI labels
 TRANSLATIONS = {
     "en": {
-        
-        "words": "Words",
-        "read": "Read",
-        "sprint": "SPRINT",
-        "done": "DONE",
-        "status": "Status"
+        "ui": {
+            "title": "Title: ",
+            "tags": "Tags: ",
+            "command": "Enter Command: ",
+            "new_post": "[NEW]",
+            "lang_feedback": "Language: ENGLISH",
+            "header": " BLIM.PY | BLOGGER DISTRACTION-FREE EDITOR",
+            "title_prompt": "Title: ",
+            "tags_prompt": "Tags:  ",
+            "command_prompt": "Enter Command: ",
+            "warning_prompt": "UNSAVED! Proceed? (y/n): ",
+            "browser_title": "  POST BROWSER",
+            "fetching": "Fetching posts...",
+        },
+        "messages": {
+            "offline": "⚠️ OFFLINE MODE: Google unreachable.",
+            "recovery_found": "RECOVERY FILE FOUND! Type :restore",
+            "no_errors": "✅ No errors",
+            "errors_found": "❌ {count} errors: {sample}...",
+            "save_success": "Saved with Markdown!",
+            "save_fail": "SAVE FAILED: Offline",
+            "empty_doc": "Empty document",
+            "sprint_start": "🚀 Sprint Started! Goal: {mins}m",
+            "sprint_done": "★ DONE! +{net_gain} words ★",
+        },
+        "status": {
+            "words": "Words",
+            "read": "Read",
+            "sprint": "SPRINT",
+            "done": "DONE",
+            "status": "STATUS",
+        }
     },
     "es": {
-        "words": "Palabras",
-        "read": "Lectura",
-        "sprint": "SPRINT",
-        "done": "LISTO",
-        "status": "Estado"
+        "ui": {
+            "title": "Título: ",
+            "tags": "Etiquetas: ",
+            "command": "Introduce Commando: ",
+            "new_post": "[NUEVO]",
+            "lang_feedback": "Idioma: ESPAÑOL",
+            "header": " BLIM.PY | EDITOR SIN DISTRACCIONES PARA BLOGGER",
+            "title_prompt": "Título: ",
+            "tags_prompt": "Etiquetas: ",
+            "command_prompt": "Comando: ",
+            "warning_prompt": "¡SIN GUARDAR! ¿Continuar? (y/n): ",
+            "browser_title": "  NAVEGADOR DE ENTRADAS",
+            "fetching": "Buscando entradas...",
+        },
+        "messages": {
+            "offline": "⚠️ MODO OFFLINE: Google inaccesible.",
+            "recovery_found": "¡ARCHIVO DE RECUPERACIÓN! Escribe :restore",
+            "no_errors": "✅ Sin errores",
+            "errors_found": "❌ {count} errores: {sample}...",
+            "save_success": "¡Guardado con Markdown!",
+            "save_fail": "ERROR: Sin conexión",
+            "empty_doc": "Documento vacío",
+            "sprint_start": "🚀 ¡Sprint iniciado! Meta: {mins}m",
+            "sprint_done": "★ ¡LISTO! +{net_gain} palabras ★",
+        },
+        "status": {
+            "words": "Palabras",
+            "read": "Lectura",
+            "sprint": "SPRINT",
+            "done": "LISTO",
+            "status": "ESTADO",
+        }
     }
 }
