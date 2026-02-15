@@ -57,14 +57,14 @@ HELP_TEXT = {
 
   ◆ NAVEGACIÓN E INTERFAZ
     ────────────────────────────────────────────────────────────────────
-    [F1] o [:help]   › Alternar este manual
+    [F1] o [:help]   › Activar este manual
     [TAB] / [S-TAB]  › Cambiar foco (Título / Etiquetas / Cuerpo)
     [Ctrl+G]         › Ir a Barra de Comandos
     [Ctrl+O]         › Abrir Navegador (Cargar Borradores/Publicados)
 
   ◆ ESCRITURA Y PRODUCTIVIDAD
     ────────────────────────────────────────────────────────────────────
-    [:sprint NN]     › Iniciar Sprint de NN minutos
+    [:sprint NN]     › Iniciar Sprint de Escritura de NN minutos
     [:restore]       › Recuperar contenido tras error/salida
     [:new]           › Limpiar pantalla (Nueva entrada)
     [Ctrl+T]         › Modo Fantasma (Ocultar interfaz al escribir)
