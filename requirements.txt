@@ -1,8 +1,20 @@
-pytest
-pytest-mock
-prompt-toolkit
-pyspellchecker
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-pygments
+# Core Editor & UI
+prompt-toolkit==3.0.43
+pygments==2.17.2
+
+# Features (Spellcheck & Markdown)
+pyspellchecker==0.8.1
+markdown==3.5.2
+
+# Google Blogger API
+google-api-python-client==2.116.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0
+
+# Development & Testing
+pytest==8.0.0
+pytest-mock==3.12.0
+
+# Packaging
+setuptools
+wheel
