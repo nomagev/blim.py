@@ -25,5 +25,6 @@ venv/
 .blim_recovery.json
 
 # System files
+.coverage
 .DS_Store
 Thumbs.db

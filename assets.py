@@ -7,7 +7,7 @@ BANNER = r"""
     ██╔══██╗██║     ██║██║╚██╔╝██║       ██╔═══╝   ╚██╔╝  
     ██████╔╝███████╗██║██║ ╚═╝ ██║  ██╗  ██║        ██║   
     ╚═════╝ ╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝  ╚═╝        ╚═╝    
-        DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.0
+        DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.1
 """
 
 # Dictionary for multi-language Help
@@ -107,6 +107,7 @@ TRANSLATIONS = {
             "warning_prompt": "POST UNSAVED! Proceed? (y/n): ",
             "browser_title": "  POST BROWSER",
             "fetching": "Fetching posts...",
+            "browser_hint": "Press ENTER to load, Control+O to exit.",
         },
         "messages": {
             "offline": "⚠️ OFFLINE MODE: Google unreachable.",
@@ -141,6 +142,7 @@ TRANSLATIONS = {
             "warning_prompt": "¡POST SIN GUARDAR! ¿Continuar? (y/n): ",
             "browser_title": "  NAVEGADOR DE ENTRADAS",
             "fetching": "Buscando entradas...",
+            "browser_hint": "ENTER para cargar entrada, Control+O para salir."
         },
         "messages": {
             "offline": "⚠️ MODO OFFLINE: Google inaccesible.",
