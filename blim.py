@@ -26,6 +26,17 @@ from assets import BANNER, HELP_TEXT, TRANSLATIONS
 
 # --- Style Definition ---
 blim_style = Style.from_dict({
+    # Markdown Styles
+    'md.header': 'bold cyan',
+    'md.bold': 'bold yellow',
+    'md.italic': 'italic green',
+    'md.code': 'bg:#333333 #ffffff',
+    'md.link': 'underline blue',
+    'md.quote': 'magenta',
+    'md.strike': 'fg:#888888',
+    'md.link': 'underline blue',
+    
+    # UI elements
     'status-warn': 'bg:#ff0000 #ffffff bold',
     'status-bar': 'bg:#222222 #00ff00',
     'status-goal': 'bg:#ffd700 #000000 bold',
@@ -36,28 +47,68 @@ blim_style = Style.from_dict({
     'body': 'fg:#00ff00 bg:#000000',
     'reverse-header': 'reverse bold',
 })
-
-# --- Lexer ---
-class SpellCheckLexer(Lexer):
+# --- Lexer for Spell Checking plus markdown highlighting ---
+class BlimLexer(Lexer):
     def __init__(self, editor):
         self.editor = editor
+        # Inline patterns (things that happen inside a sentence)
+        self.md_rules = [
+            (r'\*\*.*?\*\*', 'class:md.bold'),
+            (r'(?<!\*)\*[^*].*?[^*]\*(?!\*)', 'class:md.italic'),
+            (r'~~.*?~~', 'class:md.strike'),      # Strikethrough
+            (r'\[.*?\]\(.*?\)', 'class:md.link'), # Links [text](url)
+            (r'`.*?`', 'class:md.code'),
+        ]
 
     def lex_document(self, document: Document):
         def get_line(lineno):
             line_text = document.lines[lineno]
-            # Optimized regex split for prompt-toolkit
-            words = re.split(r"([^\w']+)", line_text)
-            formatted_line = []
             
-            for piece in words:
-                style = ''
-                if re.match(r"[\w']+", piece):
-                    is_known = self.editor.spell.known([piece.lower()]) if self.editor.spell else True
-                    if not is_known:
-                        style = 'class:spell-error'
-                formatted_line.append((style, piece))
+            # 1. Check for Line-level Markdown (Headers and Quotes)
+            if line_text.startswith('#'):
+                return [('class:md.header', line_text)]
+            if line_text.startswith('>'):
+                return [('class:md.quote', line_text)]
+
+            # 2. Process Inline Markdown and Spelling
+            formatted_line = []
+            last_pos = 0
+            
+            # Find all bold/italic/code matches in this line
+            matches = []
+            for pattern, style in self.md_rules:
+                for m in re.finditer(pattern, line_text):
+                    matches.append((m.start(), m.end(), style))
+            
+            # Sort matches so we process the line from left to right
+            matches.sort()
+
+            for start, end, style in matches:
+                # If there is text BEFORE the markdown, spellcheck it
+                if start > last_pos:
+                    self._add_spellchecked_text(formatted_line, line_text[last_pos:start])
+                
+                # Add the Markdown part (the bold/italic/code block)
+                formatted_line.append((style, line_text[start:end]))
+                last_pos = end
+
+            # Add any remaining text at the end of the line (and spellcheck it)
+            if last_pos < len(line_text):
+                self._add_spellchecked_text(formatted_line, line_text[last_pos:])
+
             return formatted_line
         return get_line
+
+    def _add_spellchecked_text(self, formatted_line, text):
+        """Helper to handle the spelling logic for plain text gaps."""
+        words = re.split(r"([^\w']+)", text)
+        for piece in words:
+            style = ''
+            if re.match(r"[\w']+", piece):
+                is_known = self.editor.spell.known([piece.lower()]) if self.editor.spell else True
+                if not is_known:
+                    style = 'class:spell-error'
+            formatted_line.append((style, piece))
 
 # --- Main Editor Class ---
 class BlimEditor:
@@ -131,9 +182,9 @@ class BlimEditor:
         # UI Fields
         self.header_label = Label(text=lambda: self._t("header"), style='class:reverse-header')
 
-        self.title_field = TextArea(height=1, prompt=lambda: self._t("title"), multiline=False, lexer=SpellCheckLexer(self), focus_on_click=True)
+        self.title_field = TextArea(height=1, prompt=lambda: self._t("title"), multiline=False, lexer=BlimLexer(self), focus_on_click=True)
         self.tags_field = TextArea(height=1, prompt=lambda: self._t("tags"), multiline=False, focus_on_click=True)
-        self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=SpellCheckLexer(self), wrap_lines=True, focus_on_click=True)
+        self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=BlimLexer(self), wrap_lines=True, focus_on_click=True)
         
         self.command_field = TextArea(height=1, prompt=lambda: self._t("command"), style='class:prompt-normal', multiline=False, accept_handler=self.handle_normal_input, focus_on_click=True)
         self.warning_field = TextArea(height=1, prompt=lambda: self._t("warning_prompt"), style='class:status-warn', multiline=False, accept_handler=self.handle_warning_input, focus_on_click=True)
@@ -521,13 +572,6 @@ class BlimEditor:
                 self.show_browser = False
                 # Return to the main editor
                 get_app().layout.focus(self.body_field)
-
-        # @kb.add('enter', filter=Condition(lambda: self.show_browser and get_app().layout.has_focus(self.browser_field)))
-        # def _(event): 
-        #     if self.posts_list: 
-        #        self.fetch_and_load(self.posts_list[self.browser_index]['id'])
-        #        self.show_browser = False
-        #        get_app().layout.focus(self.body_field)
 
     def start_sprint(self, mins):
         self.sprint_time_left = int(mins) * 60
