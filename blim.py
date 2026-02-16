@@ -1,5 +1,19 @@
 # Blim.py
 # Copyright (C) 2026 Nomagev
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import os, sys, time, json, re, asyncio
 from unittest import result
@@ -199,9 +213,9 @@ class BlimEditor:
     def _init_layout(self):
         # Rows
         self.header_bar = VSplit([
-            Label(text=" v.1.1 ", style='class:reverse-header'), 
+            Label(text=" v1.4.0 ", style='class:reverse-header'), 
             self.header_label, 
-            Label(text=" [F1] Help ", style='class:reverse-header')
+            Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') # Translated
         ], height=1)
         
         status_bar_view = VSplit([Window(), Label(text=self.get_status_text, style='class:status-bar'), Window()], height=1)
