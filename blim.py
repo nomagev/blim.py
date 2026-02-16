@@ -2,9 +2,11 @@
 # Copyright (C) 2026 Nomagev
 
 import os, sys, time, json, re, asyncio
+from unittest import result
 from prompt_toolkit import Application
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.layout import Layout, HSplit, VSplit, Window, ConditionalContainer, DynamicContainer
+from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.widgets import TextArea, Label
 from prompt_toolkit.key_binding import KeyBindings
@@ -24,10 +26,12 @@ from assets import BANNER, HELP_TEXT, TRANSLATIONS
 
 # --- Style Definition ---
 blim_style = Style.from_dict({
-    'status-warn': 'bg:#ff0000 #ffffff bold', 
+    'status-warn': 'bg:#ff0000 #ffffff bold',
+    'status-bar': 'bg:#222222 #00ff00',
+    'status-goal': 'bg:#ffd700 #000000 bold',
+    'status-dirty': '#ff0000',
     'prompt-normal': '#00ff00 bold',
     'spell-error': 'fg:#ffaa00 bold',
-    'status-bar': 'bg:#222222 #00ff00',
     'help-text': 'fg:#00ff00 bg:#000000', 
     'body': 'fg:#00ff00 bg:#000000',
     'reverse-header': 'reverse bold',
@@ -126,7 +130,7 @@ class BlimEditor:
     def _init_ui_components(self):
         # UI Fields
         self.header_label = Label(text=lambda: self._t("header"), style='class:reverse-header')
-        
+
         self.title_field = TextArea(height=1, prompt=lambda: self._t("title"), multiline=False, lexer=SpellCheckLexer(self), focus_on_click=True)
         self.tags_field = TextArea(height=1, prompt=lambda: self._t("tags"), multiline=False, focus_on_click=True)
         self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=SpellCheckLexer(self), wrap_lines=True, focus_on_click=True)
@@ -206,9 +210,23 @@ class BlimEditor:
         
         # Reading Stats
         word_count = len(self.body_field.text.split())
-        read_min = max(1, round(word_count / 225))
-        goal_label = f"{t['words']}: {word_count}"
+        result = []
+
+        if word_count >= self.word_goal:
+            result.append(('class:status-goal', f" ★ {t['words']}: {word_count}/{self.word_goal} ★ "))
+        else:
+            # Use empty string for default style
+            result.append(('', f" {t['words']}: {word_count}/{self.word_goal} "))
         
+        result.append(('', " | "))
+
+        read_min = max(1, round(word_count / 225))
+        result.append(('', f" {read_min} min {t.get('read', 'read')} "))
+        
+        if dirty:
+            result.append(('class:status-dirty', dirty))
+        return result
+
         # Timer
         elapsed = int(time.time() - self.start_time)
         mins, secs = divmod(elapsed, 60)

@@ -132,7 +132,7 @@ TRANSLATIONS = {
         "ui": {
             "title": "Título: ",
             "tags": "Etiquetas: ",
-            "command": "Introduce Commando: ",
+            "command": "Introduce Comando: ",
             "new_post": "[NUEVO]",
             "lang_feedback": "Idioma: ESPAÑOL",
             "header": " BLIM.PY | EDITOR SIN DISTRACCIONES PARA BLOGGER",
