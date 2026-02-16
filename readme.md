@@ -74,3 +74,6 @@ BLIM.PY is a terminal-based, minimalist writing environment designed for authors
 This repository includes a `.gitignore` file to ensure that your `client_secrets.json`, `token.json`, and `config.json` are never uploaded to GitHub. 
 
 **Never share these files.** They contain your private blog access and Google API credentials.
+
+## License
+**License:** This project is licensed under the **GNU General Public License v2.0.** You are free to share and change this software as long as the source code remains open.
