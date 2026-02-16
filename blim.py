@@ -440,7 +440,19 @@ class BlimEditor:
         def _(event): self.show_help = not self.show_help; self.show_browser = False
         
         @kb.add('c-o')
-        def _(event): self.show_browser = not self.show_browser; self.show_help = False; self.fetch_recent_posts()
+        def _(event):
+            self.show_browser = not self.show_browser
+            self.show_help = False
+            if self.show_browser:
+                self.fetch_recent_posts()
+                # FOCUS THE LIST IMMEDIATELY
+                get_app().layout.focus(self.browser_field)
+            else:
+                # FOCUS THE EDITOR WHEN CLOSING
+                get_app().layout.focus(self.body_field)
+
+        # @kb.add('c-o')
+        # def _(event): self.show_browser = not self.show_browser; self.show_help = False; self.fetch_recent_posts()
         
         @kb.add('tab')
         def _(event): event.app.layout.focus_next()
@@ -501,12 +513,21 @@ class BlimEditor:
         @kb.add('down', filter=Condition(lambda: self.show_browser))
         def _(event): self.browser_index = min(len(self.posts_list)-1, self.browser_index + 1); self.render_browser()
         
-        @kb.add('enter', filter=Condition(lambda: self.show_browser and get_app().layout.has_focus(self.browser_field)))
+        @kb.add('enter', filter=Condition(lambda: self.show_browser))
         def _(event): 
             if self.posts_list: 
+                # Use the index to get the ID
                 self.fetch_and_load(self.posts_list[self.browser_index]['id'])
                 self.show_browser = False
+                # Return to the main editor
                 get_app().layout.focus(self.body_field)
+
+        # @kb.add('enter', filter=Condition(lambda: self.show_browser and get_app().layout.has_focus(self.browser_field)))
+        # def _(event): 
+        #     if self.posts_list: 
+        #        self.fetch_and_load(self.posts_list[self.browser_index]['id'])
+        #        self.show_browser = False
+        #        get_app().layout.focus(self.body_field)
 
     def start_sprint(self, mins):
         self.sprint_time_left = int(mins) * 60
