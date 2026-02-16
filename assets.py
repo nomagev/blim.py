@@ -7,7 +7,7 @@ BANNER = r"""
     ██╔══██╗██║     ██║██║╚██╔╝██║       ██╔═══╝   ╚██╔╝  
     ██████╔╝███████╗██║██║ ╚═╝ ██║  ██╗  ██║        ██║   
     ╚═════╝ ╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝  ╚═╝        ╚═╝    
-        DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.1
+    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.2.0
 """
 
 # Dictionary for multi-language Help
