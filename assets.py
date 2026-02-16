@@ -7,7 +7,7 @@ BANNER = r"""
     ██╔══██╗██║     ██║██║╚██╔╝██║       ██╔═══╝   ╚██╔╝  
     ██████╔╝███████╗██║██║ ╚═╝ ██║  ██╗  ██║        ██║   
     ╚═════╝ ╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝  ╚═╝        ╚═╝    
-    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.3.0
+    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.4.0
 """
 
 # Dictionary for multi-language Help
@@ -30,6 +30,7 @@ HELP_TEXT = {
     [:sprint NN]     › Start a NN minute Word Sprint
     [:restore]       › Recover content from last crash/exit
     [:new]           › Clear screen for a fresh start
+    [:speed NN]      › Set reading speed (words per minute)
     [Ctrl+T]         › Toggle Ghost Mode (Hide UI while writing)
     [Ctrl+D]         › Run Spellcheck / Dictionary Check
 
@@ -47,6 +48,7 @@ HELP_TEXT = {
     [Control+Q]      › Blockquote 
     Headers          › # H1, ## H2, ### H3
     Links            › [Text](url)
+    Strikethrough    › ~~Strikethrough~~
 
 ────────────────────────────────────────────────────────────────────────
  [Press F1 to Resume Writing]
@@ -69,6 +71,7 @@ HELP_TEXT = {
     [:sprint NN]     › Iniciar Sprint de Escritura de NN minutos
     [:restore]       › Recuperar contenido tras error/salida
     [:new]           › Limpiar pantalla (Nueva entrada)
+    [:speed NN]      › Establecer velocidad de lectura (palabras por minuto)
     [Ctrl+T]         › Modo Fantasma (Ocultar interfaz al escribir)
     [Ctrl+D]         › Verificar Ortografía (Diccionario)
 
@@ -86,6 +89,7 @@ HELP_TEXT = {
     [Control+Q]      › Citar Bloque
     Encabezados      › # T1, ## T2, ### T3
     Enlaces          › [Texto](url)
+    Tachado          › ~~Tachado~~
 ────────────────────────────────────────────────────────────────────────
  [Presiona F1 para volver a escribir]
 """
@@ -108,6 +112,23 @@ TRANSLATIONS = {
             "browser_title": "  POST BROWSER",
             "fetching": "Fetching posts...",
             "browser_hint": "Press ENTER to load, Control+O to exit.",
+            'sprint_start': "🚀 Sprint Started! Goal: {mins}m",
+            'sprint_done': "★ DONE! +{gain} words ★",
+            'ghost_on': "Ghost Mode: ON",
+            'ghost_off': "Ghost Mode: OFF",
+            'offline': "⚠️ OFFLINE MODE: Google unreachable.",
+            'save_fail': "SAVE FAILED: Offline",
+            'load_error': "Load Error",
+            'empty_doc': "Empty document",
+            'ready': "Ready ({lang})",
+            'recovery_found': "RECOVERY FILE FOUND! Type :restore",
+            'no_errors': "✅ No errors ({lang})",
+            'errors_found': "❌ {count} errors: {list}...",
+            'saved': "Saved with Markdown!",
+            'save_error': "Save Error: {error}",
+            'status_draft': "DRAFT",
+            'status_live': "LIVE",
+            'speed_set': "Reading speed: {speed} wpm",
         },
         "messages": {
             "offline": "⚠️ OFFLINE MODE: Google unreachable.",
@@ -122,8 +143,8 @@ TRANSLATIONS = {
         },
         "status": {
             "words": "Words",
-            "read": "Read",
-            "sprint": "SPRINT",
+            "read": "min Read",
+            "sprint": "Sprint",
             "done": "DONE",
             "status": "STATUS",
         }
@@ -142,7 +163,24 @@ TRANSLATIONS = {
             "warning_prompt": "¡POST SIN GUARDAR! ¿Continuar? (y/n): ",
             "browser_title": "  NAVEGADOR DE ENTRADAS",
             "fetching": "Buscando entradas...",
-            "browser_hint": "ENTER para cargar entrada, Control+O para salir."
+            "browser_hint": "ENTER para cargar entrada, Control+O para salir.",
+            'sprint_start': "🚀 ¡Sprint iniciado! Meta: {mins}m",
+            'sprint_done': "★ ¡LISTO! +{gain} palabras ★",
+            'ghost_on': "Modo Fantasma: ACTIVADO",
+            'ghost_off': "Modo Fantasma: DESACTIVADO",
+            'offline': "⚠️ MODO OFFLINE: Google inaccesible.",
+            'save_fail': "ERROR AL GUARDAR: Offline",
+            'load_error': "Error de carga",
+            'empty_doc': "Documento vacío",
+            'ready': "Listo ({lang})",
+            'recovery_found': "¡ARCHIVO DE RECUPERACIÓN! Escribe :restore",
+            'no_errors': "✅ Sin errores ({lang})",
+            'errors_found': "❌ {count} errores: {list}...",
+            'saved': "¡Guardado con Markdown!",
+            'save_error': "Error al guardar: {error}",
+            'status_draft': "BORRADOR",
+            'status_live': "PUBLICADO",
+            'speed_set': "Velocidad de lectura: {speed} ppm",
         },
         "messages": {
             "offline": "⚠️ MODO OFFLINE: Google inaccesible.",
@@ -157,8 +195,8 @@ TRANSLATIONS = {
         },
         "status": {
             "words": "Palabras",
-            "read": "Lectura",
-            "sprint": "SPRINT",
+            "read": "Min Lectura",
+            "sprint": "Sprint",
             "done": "LISTO",
             "status": "ESTADO",
         }

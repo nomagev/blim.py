@@ -127,7 +127,7 @@ class BlimEditor:
         self.browser_index = 0
         self.posts_list = []
         self.start_time = time.time()
-        self.last_spell_report = f"Ready ({self.lang.upper()})"
+        self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
         
         # Sprint & Ghost Mode
         self.sprint_active = False
@@ -137,6 +137,9 @@ class BlimEditor:
         self.last_interaction_time = time.time()
         self.ghost_timeout = 3
         
+        # Reading Speed
+        self.reading_speed = 225
+
         # Services
         self.spell = SpellChecker(language=self.lang)
         self.service = self.authenticate()
@@ -155,7 +158,7 @@ class BlimEditor:
         # Final Setup
         self.apply_language(self.lang)
         if os.path.exists(self.recovery_path):
-            self.last_spell_report = "RECOVERY FILE FOUND! Type :restore"
+            self.last_spell_report = self._t("recovery_found")
 
     def _load_paths(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
@@ -252,49 +255,55 @@ class BlimEditor:
             return build('blogger', 'v3', credentials=creds)
         except (TransportError, Exception):
             self.is_offline = True
-            self.last_spell_report = "⚠️ OFFLINE MODE: Google unreachable."
+            self.last_spell_report = self._t("offline")
             return None
 
     def get_status_text(self):
+        # t already contains the translations for the current language
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])['status']
         dirty = " *" if self.is_dirty() else ""
-        
-        # Reading Stats
         word_count = len(self.body_field.text.split())
         result = []
 
+        # 1. Word Count / Goal
         if word_count >= self.word_goal:
             result.append(('class:status-goal', f" ★ {t['words']}: {word_count}/{self.word_goal} ★ "))
         else:
-            # Use empty string for default style
             result.append(('', f" {t['words']}: {word_count}/{self.word_goal} "))
         
         result.append(('', " | "))
 
-        read_min = max(1, round(word_count / 225))
-        result.append(('', f" {read_min} min {t.get('read', 'read')} "))
+        # 2. Reading Time (Corrected to use translated labels)
+        read_min = max(1, round(word_count / self.reading_speed))
+        # We assume t['read'] in assets.py is "min read" or "min lectura"
+        result.append(('', f" {read_min} {t.get('read', 'read')} "))
+        
+        # 3. Sprint Timer
+        if self.sprint_active:
+            remaining = max(0, self.sprint_time_left)
+            s_mins, s_secs = divmod(int(remaining), 60)
+            sprint_color = 'class:status-warn' if remaining < 60 else '' 
+            
+            result.append(('', " | 🚀 "))
+            if remaining == 0:
+                # Use translated 'done' or 'listo'
+                result.append(('class:status-goal', f" {t.get('done', 'DONE')}! "))
+            else:
+                result.append((sprint_color, f" {s_mins:02d}:{s_secs:02d} "))
+
+        # 4. Global Timer & Dirty Flag
+        elapsed = int(time.time() - self.start_time)
+        mins, secs = divmod(elapsed, 60)
+        result.append(('', f" | {mins:02d}:{secs:02d} "))
         
         if dirty:
             result.append(('class:status-dirty', dirty))
+            
+        # 5. Spellcheck/Feedback
+        result.append(('', f" | {self.last_spell_report} "))
+        
         return result
 
-        # Timer
-        elapsed = int(time.time() - self.start_time)
-        mins, secs = divmod(elapsed, 60)
-        
-        # Sprint Stats
-        sprint_label = ""
-        if self.sprint_active:
-            sprint_label = f" | {t['sprint']}"
-            remaining = max(0, self.sprint_time_left)
-            s_mins, s_secs = divmod(int(remaining), 60)
-            if remaining == 0:
-                sprint_label = f" | {t['done']}!"
-            else:
-                sprint_label += f" {s_mins:02d}:{s_secs:02d}"
-
-        return f" [{self.post_status}]{dirty} | {goal_label} | {t['read']}: {read_min}m{sprint_label} | {mins:02d}:{secs:02d} | {self.last_spell_report} "
-        
     def is_dirty(self): return self.body_field.text.strip() != self.last_saved_content.strip()
 
     def apply_language(self, lang_code):
@@ -330,11 +339,22 @@ class BlimEditor:
         elif cmd == ':restore': self.load_recovery()
         elif cmd.startswith(':sprint'):
             parts = cmd.split()
-            self.start_sprint(parts[1] if len(parts) > 1 else 25)
+            try:
+                # Default to 25 if no number provided or if conversion fails
+                duration = int(parts[1]) if len(parts) > 1 else 25
+                self.start_sprint(duration)
+            except ValueError:
+                self.start_sprint(25)
+            get_app().layout.focus(self.body_field) # Refocus editor after starting
         elif cmd.isdigit(): 
             self.fetch_and_load(cmd)
             get_app().layout.focus(self.body_field)
-            
+        elif cmd.startswith(':speed'):
+            parts = cmd.split()
+            if len(parts) > 1 and parts[1].isdigit():
+                self.reading_speed = int(parts[1])
+                self.last_spell_report = self._t("speed_set").format(speed=self.reading_speed)
+
         buffer.text = ""
 
     def handle_warning_input(self, buffer):
@@ -397,20 +417,25 @@ class BlimEditor:
             self.title_field.text = post.get('title', '')
             self.tags_field.text = ", ".join(post.get('labels', []))
             self.body_field.text = self.last_saved_content = self.clean_html_for_editor(post.get('content', ''))
-        except: self.last_spell_report = "Load Error"
+        except: self.last_spell_report = self._t("load_error")
 
     def run_spellcheck(self):
         text = self.body_field.text.strip()
         if not text:
-            self.last_spell_report = "Empty doc"
+            self.last_spell_report = self._t("empty_doc")
             return
         words = re.findall(r'\w+', text.lower())
         misspelled = self.spell.unknown(words)
+        
         if not misspelled:
-            self.last_spell_report = f"✅ No errors ({self.lang.upper()})"
+            self.last_spell_report = self._t("no_errors").format(lang=self.lang.upper())
         else:
-            self.last_spell_report = f"❌ {len(misspelled)} errors: {', '.join(list(misspelled)[:3])}..."
-
+            err_list = ', '.join(list(misspelled)[:3])
+            self.last_spell_report = self._t("errors_found").format(
+            count=len(misspelled), 
+            list=err_list
+    )
+    
     def clean_html_for_editor(self, html):
         text = re.sub(r'<(p|div|h[1-6])[^>]*>', '', html)
         text = re.sub(r'</(p|div|h[1-6])>', '\n\n', text)
@@ -450,7 +475,7 @@ class BlimEditor:
 
     def save_post(self, is_draft=True):
         if self.is_offline or not self.service:
-            self.last_spell_report = "SAVE FAILED: Offline"
+            self.last_spell_report = self._t("save_fail")
             return False
 
         content_html = self._parse_markdown(self.body_field.text)
@@ -466,10 +491,10 @@ class BlimEditor:
                 self.current_post_id = res['id']
             
             self.last_saved_content = self.body_field.text
-            self.post_status = "DRAFT" if is_draft else "LIVE"
-            self.last_spell_report = "Saved with Markdown!"
+            self.post_status = self._t("status_draft") if is_draft else self._t("status_live")
+            self.last_spell_report = self._t("saved")
         except Exception as e:
-            self.last_spell_report = f"Save Error: {str(e)[:20]}"
+            self.last_spell_report = self._t("save_error").format(error=str(e)[:20])
 
     def _wrap_selection(self, symbol, offset_len):
         buff = self.body_field.buffer
@@ -526,7 +551,8 @@ class BlimEditor:
         @kb.add('c-t')
         def _(event): 
             self.ghost_mode_enabled = not self.ghost_mode_enabled
-            self.last_spell_report = f"Ghost Mode: {'ON' if self.ghost_mode_enabled else 'OFF'}"
+            msg_key = "ghost_on" if self.ghost_mode_enabled else "ghost_off"
+            self.last_spell_report = self._t(msg_key)
 
         # Markdown Formatting Hotkeys
         @kb.add('c-b')
@@ -577,7 +603,7 @@ class BlimEditor:
         self.sprint_time_left = int(mins) * 60
         self.sprint_active = True
         self.sprint_start_words = len(self.body_field.text.split())
-        self.last_spell_report = f"🚀 Sprint Started! Goal: {mins}m"
+        self.last_spell_report = self._t("sprint_start").format(mins=mins)
     
     def update_sprint(self):
         if self.sprint_active and self.sprint_time_left > 0:
@@ -585,7 +611,7 @@ class BlimEditor:
             if self.sprint_time_left <= 0:
                 self.sprint_active = False
                 gain = max(0, len(self.body_field.text.split()) - self.sprint_start_words)
-                self.last_spell_report = f"★ DONE! +{gain} words ★"
+                self.last_spell_report = self._t("sprint_done").format(gain=gain)
 
     def auto_save_recovery(self):
         try:
