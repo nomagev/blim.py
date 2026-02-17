@@ -36,7 +36,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.auth.exceptions import TransportError
 
-from assets import BANNER, HELP_TEXT, TRANSLATIONS
+from core.assets import get_banner, HELP_TEXT, TRANSLATIONS
 
 # --- Style Definition ---
 blim_style = Style.from_dict({
@@ -52,11 +52,13 @@ blim_style = Style.from_dict({
     
     # UI elements
     'status-warn': 'bg:#ff0000 #ffffff bold',
+    # 'status-warn': 'bg:#ff0000 #ffffff bold',
     'status-bar': 'bg:#222222 #00ff00',
     'status-goal': 'bg:#ffd700 #000000 bold',
     'status-dirty': '#ff0000',
     'prompt-normal': '#00ff00 bold',
-    'spell-error': 'fg:#ffaa00 bold',
+    'spell-error': 'ansigray underline', 
+    # 'spell-error': 'fg:#ffaa00 bold', <-- Original (TO BE DELETED IF NOT NEEDED)
     'help-text': 'fg:#00ff00 bg:#000000', 
     'body': 'fg:#00ff00 bg:#000000',
     'reverse-header': 'reverse bold',
@@ -77,52 +79,62 @@ class BlimLexer(Lexer):
     def lex_document(self, document: Document):
         def get_line(lineno):
             line_text = document.lines[lineno]
+            line_start_index = document.translate_row_col_to_index(lineno, 0)
             
-            # 1. Check for Line-level Markdown (Headers and Quotes)
-            if line_text.startswith('#'):
-                return [('class:md.header', line_text)]
-            if line_text.startswith('>'):
-                return [('class:md.quote', line_text)]
+            # 1. Line-level Markdown
+            if line_text.startswith('#'): return [('class:md.header', line_text)]
+            if line_text.startswith('>'): return [('class:md.quote', line_text)]
 
-            # 2. Process Inline Markdown and Spelling
+            # 2. Inline Markdown and Spelling
             formatted_line = []
             last_pos = 0
-            
-            # Find all bold/italic/code matches in this line
             matches = []
             for pattern, style in self.md_rules:
                 for m in re.finditer(pattern, line_text):
                     matches.append((m.start(), m.end(), style))
-            
-            # Sort matches so we process the line from left to right
             matches.sort()
 
             for start, end, style in matches:
-                # If there is text BEFORE the markdown, spellcheck it
                 if start > last_pos:
-                    self._add_spellchecked_text(formatted_line, line_text[last_pos:start])
-                
-                # Add the Markdown part (the bold/italic/code block)
+                    # Pass document.cursor_position here!
+                    self._add_spellchecked_text(formatted_line, line_text[last_pos:start], 
+                                               line_start_index + last_pos, document.cursor_position)
                 formatted_line.append((style, line_text[start:end]))
                 last_pos = end
 
-            # Add any remaining text at the end of the line (and spellcheck it)
             if last_pos < len(line_text):
-                self._add_spellchecked_text(formatted_line, line_text[last_pos:])
-
+                # Pass document.cursor_position here too!
+                self._add_spellchecked_text(formatted_line, line_text[last_pos:], 
+                                           line_start_index + last_pos, document.cursor_position)
             return formatted_line
         return get_line
 
-    def _add_spellchecked_text(self, formatted_line, text):
-        """Helper to handle the spelling logic for plain text gaps."""
-        words = re.split(r"([^\w']+)", text)
-        for piece in words:
-            style = ''
-            if re.match(r"[\w']+", piece):
-                is_known = self.editor.spell.known([piece.lower()]) if self.editor.spell else True
-                if not is_known:
-                    style = 'class:spell-error'
-            formatted_line.append((style, piece))
+    def _add_spellchecked_text(self, fragments, text, start_index, cursor_pos):
+        last_pos = 0
+        # Use regex to find words, but keep the spaces/punctuation exactly as they are
+        for match in re.finditer(r'\w+', text):
+            word = match.group()
+            word_start = start_index + match.start()
+            word_end = start_index + match.end()
+            
+            # Add everything BEFORE the word (spaces, semicolons, etc.)
+            if match.start() > last_pos:
+                fragments.append(('', text[last_pos:match.start()]))
+            
+            # Spelling Logic
+            is_unknown = word.lower() not in self.editor.spell
+            is_being_typed = word_start <= cursor_pos <= word_end
+
+            if is_unknown and not is_being_typed:
+                fragments.append(('class:spell-error', word))
+            else:
+                fragments.append(('', word))
+            
+            last_pos = match.end()
+
+        # Add everything AFTER the last word (remaining spaces/punctuation)
+        if last_pos < len(text):
+            fragments.append(('', text[last_pos:]))
 
 # --- Main Editor Class ---
 class BlimEditor:
@@ -141,6 +153,12 @@ class BlimEditor:
         self.browser_index = 0
         self.posts_list = []
         self.start_time = time.time()
+
+        # Dictionary & Spell Checker
+        self._reload_dictionary()
+        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
+        if os.path.exists(self.custom_dict_path):
+            self.spell.word_frequency.load_text_file(self.custom_dict_path)
         self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
         
         # Sprint & Ghost Mode
@@ -155,7 +173,8 @@ class BlimEditor:
         self.reading_speed = 225
 
         # Services
-        self.spell = SpellChecker(language=self.lang)
+        self._reload_dictionary()
+        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
         self.service = self.authenticate()
         
         # UI & Layout
@@ -176,10 +195,15 @@ class BlimEditor:
 
     def _load_paths(self):
         self.base_path = os.path.dirname(os.path.abspath(__file__))
-        self.config_path = os.path.join(self.base_path, 'config.json')
-        self.secrets_path = os.path.join(self.base_path, 'client_secrets.json')
-        self.token_path = os.path.join(self.base_path, 'token.json')
-        self.recovery_path = os.path.join(self.base_path, '.blim_recovery.json') # Updated to match .gitignore
+        config_dir = os.path.join(self.base_path, 'config')
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        
+        self.config_path = os.path.join(config_dir, 'config.json')
+        self.secrets_path = os.path.join(config_dir, 'client_secrets.json')
+        self.token_path = os.path.join(config_dir, 'token.json')
+        self.recovery_path = os.path.join(config_dir, '.blim_recovery.json') # Updated to match .gitignore
+        self.custom_dict_path = os.path.join(config_dir, 'custom_dictionary.txt')
 
     def _load_config(self):
         if not os.path.exists(self.config_path):
@@ -194,6 +218,13 @@ class BlimEditor:
     def _t(self, key):
         """Helper to get translation string safely."""
         return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"][key]
+
+    def _reload_dictionary(self):
+        from spellchecker import SpellChecker
+        self.spell = SpellChecker(language=self.lang)
+        # This is the "magic" part that loads your custom words
+        if os.path.exists(self.custom_dict_path):
+            self.spell.word_frequency.load_text_file(self.custom_dict_path)
 
     def _init_ui_components(self):
         # UI Fields
@@ -332,9 +363,14 @@ class BlimEditor:
         # Note: TextArea prompts update automatically via lambda, but manual refresh ensures safety
         if self.show_browser: self.render_browser()
         self.help_field.text = HELP_TEXT.get(self.lang, HELP_TEXT["en"]).strip()
-        self.spell = SpellChecker(language=self.lang)
+        self._reload_dictionary()
+        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
         self.last_spell_report = t["lang_feedback"]
     
+    def spell_check(self):
+        """Triggers a UI refresh so the Lexer re-scans the words."""
+        get_app().invalidate()
+
     def handle_normal_input(self, buffer):
         cmd = buffer.text.strip().lower()
         if not cmd:
@@ -368,6 +404,20 @@ class BlimEditor:
             if len(parts) > 1 and parts[1].isdigit():
                 self.reading_speed = int(parts[1])
                 self.last_spell_report = self._t("speed_set").format(speed=self.reading_speed)
+        elif cmd.startswith(':add '):
+            # Extract the word, make it lowercase
+            word_to_add = cmd.replace(':add ', '').strip().lower()
+            
+            if word_to_add:
+                # Append to the text file
+                with open(self.custom_dict_path, 'a', encoding='utf-8') as f:
+                    f.write(word_to_add + "\n")
+                
+                # Update the spellchecker in the current session
+                self.spell.word_frequency.load_words([word_to_add])
+                
+                self.last_spell_report = f"'{word_to_add}' {self._t('added_to_dict')}"
+                self.spell_check() # Refresh the screen to remove the gray underline
 
         buffer.text = ""
 
@@ -640,8 +690,8 @@ class BlimEditor:
         except: pass
 
 def show_loading():
-    print("\033[H\033[J" + BANNER)
-    time.sleep(1.2)
+    print("\033[H\033[J" + get_banner())
+    time.sleep(1.3)
 
 async def main():
     editor = BlimEditor()

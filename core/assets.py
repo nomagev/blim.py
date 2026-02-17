@@ -1,14 +1,17 @@
 # assets.py
 
-BANNER = r"""
-    ██████╗ ██╗     ██╗███╗   ███╗       ██████╗ ██╗   ██╗
-    ██╔══██╗██║     ██║████╗ ████║       ██╔══██╗╚██╗ ██╔╝
-    ██████╔╝██║     ██║██╔████╔██║       ██████╔╝ ╚████╔╝ 
-    ██╔══██╗██║     ██║██║╚██╔╝██║       ██╔═══╝   ╚██╔╝  
-    ██████╔╝███████╗██║██║ ╚═╝ ██║  ██╗  ██║        ██║   
-    ╚═════╝ ╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝  ╚═╝        ╚═╝    
-    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.4.0
-"""
+import os
+
+# Get the path to where banner.txt lives
+ASSETS_DIR = os.path.dirname(os.path.abspath(__file__))
+BANNER_PATH = os.path.join(ASSETS_DIR, 'banner.txt')
+
+def get_banner():
+    try:
+        with open(BANNER_PATH, 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception:
+        return "BLIM.PY" # Fallback if file is missing
 
 # Dictionary for multi-language Help
 HELP_TEXT = {
@@ -31,6 +34,7 @@ HELP_TEXT = {
     [:restore]       › Recover content from last crash/exit
     [:new]           › Clear screen for a fresh start
     [:speed NN]      › Set reading speed (words per minute)
+    [:add WORD]      › Add WORD to custom dictionary
     [Ctrl+T]         › Toggle Ghost Mode (Hide UI while writing)
     [Ctrl+D]         › Run Spellcheck / Dictionary Check
 
@@ -72,6 +76,7 @@ HELP_TEXT = {
     [:restore]       › Recuperar contenido tras error/salida
     [:new]           › Limpiar pantalla (Nueva entrada)
     [:speed NN]      › Establecer velocidad de lectura (palabras por minuto)
+    [:add PALABRA]   › Agregar PALABRA al diccionario personalizado
     [Ctrl+T]         › Modo Fantasma (Ocultar interfaz al escribir)
     [Ctrl+D]         › Verificar Ortografía (Diccionario)
 
@@ -129,6 +134,8 @@ TRANSLATIONS = {
             'status_draft': "DRAFT",
             'status_live': "LIVE",
             'speed_set': "Reading speed: {speed} wpm",
+            'help_btn': "Help",
+            'added_to_dict': "Added '{word}' to dictionary.",
         },
         "messages": {
             "offline": "⚠️ OFFLINE MODE: Google unreachable.",
@@ -181,6 +188,8 @@ TRANSLATIONS = {
             'status_draft': "BORRADOR",
             'status_live': "PUBLICADO",
             'speed_set': "Velocidad de lectura: {speed} ppm",
+            'help_btn': "Ayuda",
+            'added_to_dict': "'{word}' añadida al diccionario.",
         },
         "messages": {
             "offline": "⚠️ MODO OFFLINE: Google inaccesible.",

@@ -6,6 +6,9 @@ token.json
 config.json
 
 # Python environment/cache
+.pytest_cache/
+core/__pycache__
+tests/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -28,3 +31,12 @@ venv/
 .coverage
 .DS_Store
 Thumbs.db
+
+# Ignore private configuration and dictionaries
+config/custom_dictionary.txt
+config/token.json
+config/client_secrets.json
+config/.blim_recovery.json
+
+# Ignore logs
+logs/*.log
