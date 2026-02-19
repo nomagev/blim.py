@@ -4,4 +4,4 @@
     ██╔══██╗██║     ██║██║╚██╔╝██║       ██╔═══╝   ╚██╔╝  
     ██████╔╝███████╗██║██║ ╚═╝ ██║  ██╗  ██║        ██║   
     ╚═════╝ ╚══════╝╚═╝╚═╝     ╚═╝  ╚═╝  ╚═╝        ╚═╝    
-    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.6.0
+    DISTRACTION FREE WRITING FOR GOOGLE BLOGGER V.1.7.0

@@ -52,27 +52,38 @@ blim_style = Style.from_dict({
     
     # UI elements
     'status-warn': 'bg:#ff0000 #ffffff bold',
-    # 'status-warn': 'bg:#ff0000 #ffffff bold',
     'status-bar': 'bg:#222222 #00ff00',
     'status-goal': 'bg:#ffd700 #000000 bold',
     'status-dirty': '#ff0000',
     'prompt-normal': '#00ff00 bold',
     'spell-error': 'ansigray underline', 
-    # 'spell-error': 'fg:#ffaa00 bold', <-- Original (TO BE DELETED IF NOT NEEDED)
     'help-text': 'fg:#00ff00 bg:#000000', 
     'body': 'fg:#00ff00 bg:#000000',
     'reverse-header': 'reverse bold',
 })
+
+# The dedicated Ghost Mode style
+ghost_style = Style.from_dict({
+    **dict(blim_style.style_rules),
+    # Black out scrollbars
+    'scrollbar': 'fg:#000000 bg:#000000',
+    'scrollbar.button': 'fg:#000000 bg:#000000',
+    'scrollbar.background': 'fg:#000000 bg:#000000',
+    'scrollbar.arrow': 'fg:#000000 bg:#000000',
+    # Black out line numbers
+    'line-number': 'fg:#000000 bg:#000000',
+    'line-number.current': 'fg:#000000 bg:#000000',
+})
+
 # --- Lexer for Spell Checking plus markdown highlighting ---
 class BlimLexer(Lexer):
     def __init__(self, editor):
         self.editor = editor
-        # Inline patterns (things that happen inside a sentence)
         self.md_rules = [
             (r'\*\*.*?\*\*', 'class:md.bold'),
             (r'(?<!\*)\*[^*].*?[^*]\*(?!\*)', 'class:md.italic'),
-            (r'~~.*?~~', 'class:md.strike'),      # Strikethrough
-            (r'\[.*?\]\(.*?\)', 'class:md.link'), # Links [text](url)
+            (r'~~.*?~~', 'class:md.strike'),      
+            (r'\[.*?\]\(.*?\)', 'class:md.link'), 
             (r'`.*?`', 'class:md.code'),
         ]
 
@@ -81,11 +92,9 @@ class BlimLexer(Lexer):
             line_text = document.lines[lineno]
             line_start_index = document.translate_row_col_to_index(lineno, 0)
             
-            # 1. Line-level Markdown
             if line_text.startswith('#'): return [('class:md.header', line_text)]
             if line_text.startswith('>'): return [('class:md.quote', line_text)]
 
-            # 2. Inline Markdown and Spelling
             formatted_line = []
             last_pos = 0
             matches = []
@@ -96,14 +105,12 @@ class BlimLexer(Lexer):
 
             for start, end, style in matches:
                 if start > last_pos:
-                    # Pass document.cursor_position here!
                     self._add_spellchecked_text(formatted_line, line_text[last_pos:start], 
                                                line_start_index + last_pos, document.cursor_position)
                 formatted_line.append((style, line_text[start:end]))
                 last_pos = end
 
             if last_pos < len(line_text):
-                # Pass document.cursor_position here too!
                 self._add_spellchecked_text(formatted_line, line_text[last_pos:], 
                                            line_start_index + last_pos, document.cursor_position)
             return formatted_line
@@ -111,17 +118,14 @@ class BlimLexer(Lexer):
 
     def _add_spellchecked_text(self, fragments, text, start_index, cursor_pos):
         last_pos = 0
-        # Use regex to find words, but keep the spaces/punctuation exactly as they are
         for match in re.finditer(r'\w+', text):
             word = match.group()
             word_start = start_index + match.start()
             word_end = start_index + match.end()
             
-            # Add everything BEFORE the word (spaces, semicolons, etc.)
             if match.start() > last_pos:
                 fragments.append(('', text[last_pos:match.start()]))
             
-            # Spelling Logic
             is_unknown = word.lower() not in self.editor.spell
             is_being_typed = word_start <= cursor_pos <= word_end
 
@@ -132,14 +136,13 @@ class BlimLexer(Lexer):
             
             last_pos = match.end()
 
-        # Add everything AFTER the last word (remaining spaces/punctuation)
         if last_pos < len(text):
             fragments.append(('', text[last_pos:]))
 
 # --- Main Editor Class ---
 class BlimEditor:
     def __init__(self, test_mode=False):
-        self.test_mode = test_mode #  # Set to True to skip authentication and use mock data
+        self.test_mode = test_mode 
         self._load_paths()
         self._load_config()
         
@@ -152,16 +155,13 @@ class BlimEditor:
         self.show_help = False
         self.show_browser = False
         self.browser_index = 0
-        self.posts_list = []
         self.start_time = time.time()
 
         # Dictionary & Spell Checker
-        self.show_spelling_errors = False  # The 'Silence' Default
+        self.show_spelling_errors = False  
         self._reload_dictionary()
         if self.test_mode:
-            # Create the config directory if it doesn't exist
             os.makedirs(os.path.dirname(self.custom_dict_path), exist_ok=True)
-            # Create an empty dictionary file if it's missing
             if not os.path.exists(self.custom_dict_path):
                 with open(self.custom_dict_path, 'w', encoding='utf-8') as f:
                     f.write("")
@@ -174,29 +174,22 @@ class BlimEditor:
         self.sprint_active = False
         self.sprint_time_left = 0
         self.sprint_start_words = 0
-        self.show_spelling_errors = False
         self.ghost_mode_enabled = False 
-        self.last_interaction_time = time.time()
-        self.ghost_timeout = 3
         
         # Reading Speed
         self.reading_speed = 225
 
         # Services
         self._reload_dictionary()
-        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
         self.service = self.authenticate()
         
-        # UI & Layout
+        # UI & Layout (Order matters here to avoid duplicate definitions)
         self._init_ui_components()
         self._init_layout()
         
         # Input Handling
         self.kb = KeyBindings()
         self.setup_bindings()
-        
-        # Wake up Ghost Mode on typing
-        self.body_field.buffer.on_text_changed += lambda _: setattr(self, 'last_interaction_time', time.time())
         
         # Final Setup
         self.apply_language(self.lang)
@@ -212,7 +205,7 @@ class BlimEditor:
         self.config_path = os.path.join(config_dir, 'config.json')
         self.secrets_path = os.path.join(config_dir, 'client_secrets.json')
         self.token_path = os.path.join(config_dir, 'token.json')
-        self.recovery_path = os.path.join(config_dir, '.blim_recovery.json') # Updated to match .gitignore
+        self.recovery_path = os.path.join(config_dir, '.blim_recovery.json') 
         self.custom_dict_path = os.path.join(config_dir, 'custom_dictionary.txt')
 
     def _load_config(self):
@@ -226,13 +219,11 @@ class BlimEditor:
             self.lang = config.get("language", "es")
 
     def _t(self, key):
-        """Helper to get translation string safely."""
         return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"][key]
 
     def _reload_dictionary(self):
         from spellchecker import SpellChecker
         self.spell = SpellChecker(language=self.lang)
-        # This is the "magic" part that loads your custom words
         if os.path.exists(self.custom_dict_path):
             self.spell.word_frequency.load_text_file(self.custom_dict_path)
 
@@ -242,9 +233,19 @@ class BlimEditor:
 
         self.title_field = TextArea(height=1, prompt=lambda: self._t("title"), multiline=False, lexer=BlimLexer(self), focus_on_click=True)
         self.tags_field = TextArea(height=1, prompt=lambda: self._t("tags"), multiline=False, focus_on_click=True)
+        
+        # Body Field defined ONCE here
         self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=BlimLexer(self), wrap_lines=True, focus_on_click=True)
         
-        self.command_field = TextArea(height=1, prompt=lambda: self._t("command"), style='class:prompt-normal', multiline=False, accept_handler=self.handle_normal_input, focus_on_click=True)
+        # Command Field defined ONCE here with Ghost Icon logic
+        self.command_field = TextArea(
+            height=1, 
+            prompt=lambda: f"👻 {self._t('command')}" if self.ghost_mode_enabled else self._t("command"), 
+            style='class:prompt-normal', 
+            multiline=False, 
+            accept_handler=self.handle_normal_input, 
+            focus_on_click=True
+        )
         self.warning_field = TextArea(height=1, prompt=lambda: self._t("warning_prompt"), style='class:status-warn', multiline=False, accept_handler=self.handle_warning_input, focus_on_click=True)
         
         # Static Text Areas
@@ -256,7 +257,7 @@ class BlimEditor:
         self.header_bar = VSplit([
             Label(text=" v1.4.0 ", style='class:reverse-header'), 
             self.header_label, 
-            Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') # Translated
+            Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') 
         ], height=1)
         
         status_bar_view = VSplit([Window(), Label(text=self.get_status_text, style='class:status-bar'), Window()], height=1)
@@ -278,23 +279,39 @@ class BlimEditor:
             ConditionalContainer(content=self.browser_field, filter=Condition(lambda: self.show_browser)),
         ], width=80)
 
-        # Master Container
+        # Container Assembly
+        # Build the centered container
         self.container = HSplit([
-            self.header_row,
-            VSplit([Window(), main_stack, Window()]),
+            # Header
+            ConditionalContainer(
+                content=self.header_row,
+                filter=Condition(lambda: self.is_ui_visible())
+            ),
+            # Centered Editor: [Flexible Spacer] [Editor] [Flexible Spacer]
+            VSplit([
+                Window(), # Left spacer (takes up 50% of remaining space)
+                main_stack, 
+                Window(), # Right spacer (takes up 50% of remaining space)
+            ]),
+            # Command Bar
             DynamicContainer(lambda: warning_view if self.is_warning_mode else command_view),
-            self.status_row
+            # Status Bar
+            ConditionalContainer(
+                content=self.status_row,
+                filter=Condition(lambda: self.is_ui_visible())
+            ),
         ])
 
     def is_ui_visible(self):
-        if not self.ghost_mode_enabled: return True
-        # If user is not typing in the body, show UI
-        if not get_app().layout.has_focus(self.body_field): return True
-        # Hide if timeout expired
-        return (time.time() - self.last_interaction_time) < self.ghost_timeout
+        if not self.ghost_mode_enabled:
+            return True
+        try:
+            # Hide UI only if user is actively focused in the body
+            return not get_app().layout.has_focus(self.body_field)
+        except:
+            return True
     
     def authenticate(self):
-        # NEW: Short-circuit if testing
         if self.test_mode:
             self.is_offline = True
             return None
@@ -309,7 +326,6 @@ class BlimEditor:
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
                 else:
-                    # This line is what kills the GitHub Action
                     flow = InstalledAppFlow.from_client_secrets_file(
                         self.secrets_path, 
                         ['https://www.googleapis.com/auth/blogger']
@@ -326,13 +342,11 @@ class BlimEditor:
             return None
 
     def get_status_text(self):
-        # t already contains the translations for the current language
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])['status']
         dirty = " *" if self.is_dirty() else ""
         word_count = len(self.body_field.text.split())
         result = []
 
-        # 1. Word Count / Goal
         if word_count >= self.word_goal:
             result.append(('class:status-goal', f" ★ {t['words']}: {word_count}/{self.word_goal} ★ "))
         else:
@@ -340,12 +354,9 @@ class BlimEditor:
         
         result.append(('', " | "))
 
-        # 2. Reading Time (Corrected to use translated labels)
         read_min = max(1, round(word_count / self.reading_speed))
-        # We assume t['read'] in assets.py is "min read" or "min lectura"
         result.append(('', f" {read_min} {t.get('read', 'read')} "))
         
-        # 3. Sprint Timer
         if self.sprint_active:
             remaining = max(0, self.sprint_time_left)
             s_mins, s_secs = divmod(int(remaining), 60)
@@ -353,12 +364,10 @@ class BlimEditor:
             
             result.append(('', " | 🚀 "))
             if remaining == 0:
-                # Use translated 'done' or 'listo'
                 result.append(('class:status-goal', f" {t.get('done', 'DONE')}! "))
             else:
                 result.append((sprint_color, f" {s_mins:02d}:{s_secs:02d} "))
 
-        # 4. Global Timer & Dirty Flag
         elapsed = int(time.time() - self.start_time)
         mins, secs = divmod(elapsed, 60)
         result.append(('', f" | {mins:02d}:{secs:02d} "))
@@ -366,7 +375,6 @@ class BlimEditor:
         if dirty:
             result.append(('class:status-dirty', dirty))
             
-        # 5. Spellcheck/Feedback
         result.append(('', f" | {self.last_spell_report} "))
         
         return result
@@ -377,20 +385,15 @@ class BlimEditor:
         self.lang = lang_code
         t = TRANSLATIONS[self.lang]["ui"]
 
-        # Update Post Status Label if it's new
         if self.post_status in ["[NEW]", "[NUEVO]", "NEW"]:
             self.post_status = t["new_post"]
 
-        # Force UI Updates
-        # Note: TextArea prompts update automatically via lambda, but manual refresh ensures safety
         if self.show_browser: self.render_browser()
         self.help_field.text = HELP_TEXT.get(self.lang, HELP_TEXT["en"]).strip()
         self._reload_dictionary()
-        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
         self.last_spell_report = t["lang_feedback"]
     
     def spell_check(self):
-        """Triggers a UI refresh so the Lexer re-scans the words."""
         get_app().invalidate()
 
     def handle_normal_input(self, buffer):
@@ -412,12 +415,11 @@ class BlimEditor:
         elif cmd.startswith(':sprint'):
             parts = cmd.split()
             try:
-                # Default to 25 if no number provided or if conversion fails
                 duration = int(parts[1]) if len(parts) > 1 else 25
                 self.start_sprint(duration)
             except ValueError:
                 self.start_sprint(25)
-            get_app().layout.focus(self.body_field) # Refocus editor after starting
+            get_app().layout.focus(self.body_field) 
         elif cmd.isdigit(): 
             self.fetch_and_load(cmd)
             get_app().layout.focus(self.body_field)
@@ -427,19 +429,13 @@ class BlimEditor:
                 self.reading_speed = int(parts[1])
                 self.last_spell_report = self._t("speed_set").format(speed=self.reading_speed)
         elif cmd.startswith(':add '):
-            # Extract the word, make it lowercase
             word_to_add = cmd.replace(':add ', '').strip().lower()
-            
             if word_to_add:
-                # Append to the text file
                 with open(self.custom_dict_path, 'a', encoding='utf-8') as f:
                     f.write(word_to_add + "\n")
-                
-                # Update the spellchecker in the current session
                 self.spell.word_frequency.load_words([word_to_add])
-                
                 self.last_spell_report = f"'{word_to_add}' {self._t('added_to_dict')}"
-                self.spell_check() # Refresh the screen to remove the gray underline
+                self.spell_check() 
 
         buffer.text = ""
 
@@ -475,10 +471,8 @@ class BlimEditor:
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]
         width = 76
         
-        # 1. Header and Box Top
         lines = [t["fetching"], " ╔" + "═"*(width-2) + "╗", f" ║{t['browser_title'].center(width-2)}║", " ╠" + "═"*(width-2) + "╣"]
         
-        # 2. Post List
         for i, post in enumerate(self.posts_list[:12]):
             prefix = " › " if i == self.browser_index else "   "
             display_title = post['title'][:60].ljust(60)
@@ -486,13 +480,11 @@ class BlimEditor:
             content = f" {prefix}[{status_char}] {display_title}".ljust(width-2)
             lines.append(f" ║{content}║")
             
-        # 3. Padding for consistent height
-        while len(lines) < 16: # Adjusted to make room for hint
+        while len(lines) < 16: 
             lines.append(" ║" + " "*(width-2) + "║")
             
-        # 4. Box Bottom and Instruction Hint
         lines.append(" ╚" + "═"*(width-2) + "╝")
-        lines.append(t["browser_hint"].center(width)) # New instruction line
+        lines.append(t["browser_hint"].center(width)) 
         
         self.browser_field.text = "\n".join(lines)
 
@@ -520,7 +512,7 @@ class BlimEditor:
             self.last_spell_report = self._t("errors_found").format(
             count=len(misspelled), 
             list=err_list
-    )
+        )
     
     def clean_html_for_editor(self, html):
         text = re.sub(r'<(p|div|h[1-6])[^>]*>', '', html)
@@ -532,23 +524,19 @@ class BlimEditor:
         return re.sub(r'<(?!img|/img)[^>]+>', '', text).strip()
 
     def _parse_markdown(self, md_text):
-        # 1. Basics
         html = re.sub(r'^> (.*?)$', r'<blockquote>\1</blockquote>', md_text, flags=re.M)
         html = re.sub(r'^---$', r'<hr />', html, flags=re.M)
         html = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html, flags=re.M)
         html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.M)
         html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.M)
         
-        # 2. Lists
         html = re.sub(r'^\* (.*?)$', r'<li>\1</li>', html, flags=re.M)
         html = re.sub(r'((?:<li>.*?</li>\n?)+)', r'<ul>\1</ul>', html, flags=re.S)
 
-        # 3. Inline
         html = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', html)
         html = re.sub(r'\*(.*?)\*', r'<i>\1</i>', html)
         html = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', html)
 
-        # 4. Paragraphs
         processed_blocks = []
         for block in html.split('\n\n'):
             trimmed = block.strip()
@@ -607,33 +595,23 @@ class BlimEditor:
             self.show_help = False
             if self.show_browser:
                 self.fetch_recent_posts()
-                # FOCUS THE LIST IMMEDIATELY
                 get_app().layout.focus(self.browser_field)
             else:
-                # FOCUS THE EDITOR WHEN CLOSING
                 get_app().layout.focus(self.body_field)
 
-        # @kb.add('c-o')
-        # def _(event): self.show_browser = not self.show_browser; self.show_help = False; self.fetch_recent_posts()
-        
         @kb.add('tab')
         def _(event): event.app.layout.focus_next()
         
         @kb.add('s-tab')
         def _(event): event.app.layout.focus_previous()
 
-        # --- Around line 415 in your blim.py ---
         @kb.add('c-d')
         def _(event):
-            # Toggle visibility
             self.show_spelling_errors = not self.show_spelling_errors
-            
             if self.show_spelling_errors:
                 self.run_spellcheck() 
             else:
-                # Reset the status bar report to 'ready'
                 self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
-    
             event.app.invalidate()
         
         @kb.add('c-g')
@@ -646,11 +624,29 @@ class BlimEditor:
         def _(event): self.save_post(is_draft=False)
         
         @kb.add('c-t')
-        def _(event): 
+        def _(event):
             self.ghost_mode_enabled = not self.ghost_mode_enabled
-            msg_key = "ghost_on" if self.ghost_mode_enabled else "ghost_off"
-            self.last_spell_report = self._t(msg_key)
+            
+            # 1. Toggle the widget attributes
+            self.body_field.scrollbar = not self.ghost_mode_enabled
+            self.body_field.line_numbers = not self.ghost_mode_enabled
+            
+            # 2. Swap the global application style
+            if self.ghost_mode_enabled:
+                event.app.style = ghost_style
+                
+                # THE TRICK: Resetting focus forces the TextArea to 
+                # recalculate its internal window widths and hide the gutter.
+                event.app.layout.focus(self.command_field)
+                event.app.layout.focus(self.body_field)
+            else:
+                event.app.style = blim_style
+                # Force recalculation to bring the gutter back
+                event.app.layout.focus(self.command_field)
+                event.app.layout.focus(self.body_field)
 
+            event.app.invalidate()
+        
         # Markdown Formatting Hotkeys
         @kb.add('c-b')
         def _(event): self._wrap_selection("**", 2)
@@ -690,10 +686,8 @@ class BlimEditor:
         @kb.add('enter', filter=Condition(lambda: self.show_browser))
         def _(event): 
             if self.posts_list: 
-                # Use the index to get the ID
                 self.fetch_and_load(self.posts_list[self.browser_index]['id'])
                 self.show_browser = False
-                # Return to the main editor
                 get_app().layout.focus(self.body_field)
 
     def start_sprint(self, mins):
