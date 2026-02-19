@@ -138,7 +138,8 @@ class BlimLexer(Lexer):
 
 # --- Main Editor Class ---
 class BlimEditor:
-    def __init__(self):
+    def __init__(self, test_mode=False):
+        self.test_mode = test_mode #  # Set to True to skip authentication and use mock data
         self._load_paths()
         self._load_config()
         
@@ -156,7 +157,14 @@ class BlimEditor:
 
         # Dictionary & Spell Checker
         self._reload_dictionary()
-        # self.spell = SpellChecker(language=self.lang) <-- Original (TO BE DELETED IF NOT NEEDED)
+        if self.test_mode:
+            # Create the config directory if it doesn't exist
+            os.makedirs(os.path.dirname(self.custom_dict_path), exist_ok=True)
+            # Create an empty dictionary file if it's missing
+            if not os.path.exists(self.custom_dict_path):
+                with open(self.custom_dict_path, 'w', encoding='utf-8') as f:
+                    f.write("")
+
         if os.path.exists(self.custom_dict_path):
             self.spell.word_frequency.load_text_file(self.custom_dict_path)
         self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
@@ -284,19 +292,31 @@ class BlimEditor:
         return (time.time() - self.last_interaction_time) < self.ghost_timeout
     
     def authenticate(self):
+        # NEW: Short-circuit if testing
+        if self.test_mode:
+            self.is_offline = True
+            return None
+
         self.is_offline = False 
         try:
             creds = None
             if os.path.exists(self.token_path):
                 creds = Credentials.from_authorized_user_file(self.token_path)
+            
             if not creds or not creds.valid:
                 if creds and creds.expired and creds.refresh_token:
                     creds.refresh(Request())
                 else:
-                    flow = InstalledAppFlow.from_client_secrets_file(self.secrets_path, ['https://www.googleapis.com/auth/blogger'])
+                    # This line is what kills the GitHub Action
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.secrets_path, 
+                        ['https://www.googleapis.com/auth/blogger']
+                    )
                     creds = flow.run_local_server(port=0)
+                
                 with open(self.token_path, 'w') as token:
                     token.write(creds.to_json())
+                    
             return build('blogger', 'v3', credentials=creds)
         except (TransportError, Exception):
             self.is_offline = True
