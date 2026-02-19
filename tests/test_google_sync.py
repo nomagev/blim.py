@@ -14,7 +14,7 @@ def test_save_post_success(mock_build):
     mock_posts.update.return_value.execute.return_value = {'id': '12345'}
 
     # 2. INITIALIZE & FORCE STATE
-    editor = BlimEditor()
+    editor = BlimEditor(test_mode=True)  # Use test mode to avoid real API calls
     editor.is_offline = False  # Force online
     editor.service = mock_service # Force the mock service into the editor
     
@@ -29,11 +29,14 @@ def test_save_post_success(mock_build):
     # 4. ASSERTIONS
     # We check if the 'insert' method on our mock was called
     assert mock_posts.insert.called, "The code never called the insert method!"
-    assert "Saved" in editor.last_spell_report
+
+    # We check that the expected success message is in the last spell report
+    expected_msg = editor._t("saved") 
+    assert expected_msg in editor.last_spell_report
 
 @patch('blim.build')
 def test_save_post_failure(mock_build):
-    editor = BlimEditor()
+    editor = BlimEditor(test_mode=True)  # Use test mode to avoid real API calls
     editor.is_offline = False
     
     # 1. Create a "grumpy" service
@@ -57,4 +60,6 @@ def test_save_post_failure(mock_build):
     assert was_called, "The Blogger API was never even attempted!"
     
     # We check for "Save Error" because we EXPECTED a failure here
-    assert "Save Error" in editor.last_spell_report
+    expected_error_template = editor._t("save_error")
+    prefix = expected_error_template.split("{error}")[0]  # Get the part before the error message   
+    assert prefix in editor.last_spell_report
