@@ -40,3 +40,10 @@ config/.blim_recovery.json
 
 # Ignore logs
 logs/*.log
+
+# Test coverage files
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
