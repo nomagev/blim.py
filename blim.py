@@ -125,7 +125,7 @@ class BlimLexer(Lexer):
             is_unknown = word.lower() not in self.editor.spell
             is_being_typed = word_start <= cursor_pos <= word_end
 
-            if is_unknown and not is_being_typed:
+            if self.editor.show_spelling_errors and is_unknown and not is_being_typed:
                 fragments.append(('class:spell-error', word))
             else:
                 fragments.append(('', word))
@@ -156,6 +156,7 @@ class BlimEditor:
         self.start_time = time.time()
 
         # Dictionary & Spell Checker
+        self.show_spelling_errors = False  # The 'Silence' Default
         self._reload_dictionary()
         if self.test_mode:
             # Create the config directory if it doesn't exist
@@ -173,6 +174,7 @@ class BlimEditor:
         self.sprint_active = False
         self.sprint_time_left = 0
         self.sprint_start_words = 0
+        self.show_spelling_errors = False
         self.ghost_mode_enabled = False 
         self.last_interaction_time = time.time()
         self.ghost_timeout = 3
@@ -619,9 +621,20 @@ class BlimEditor:
         
         @kb.add('s-tab')
         def _(event): event.app.layout.focus_previous()
-        
+
+        # --- Around line 415 in your blim.py ---
         @kb.add('c-d')
-        def _(event): self.run_spellcheck()
+        def _(event):
+            # Toggle visibility
+            self.show_spelling_errors = not self.show_spelling_errors
+            
+            if self.show_spelling_errors:
+                self.run_spellcheck() 
+            else:
+                # Reset the status bar report to 'ready'
+                self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
+    
+            event.app.invalidate()
         
         @kb.add('c-g')
         def _(event): event.app.layout.focus(self.command_field)
