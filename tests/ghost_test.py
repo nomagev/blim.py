@@ -1,5 +1,8 @@
 import asyncio
 import time
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from prompt_toolkit.application import Application
 from prompt_toolkit.input import create_pipe_input
 from prompt_toolkit.layout import Layout

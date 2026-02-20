@@ -16,11 +16,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 
 import os, sys, time, json, re, asyncio
-from unittest import result
 from prompt_toolkit import Application
 from prompt_toolkit.enums import EditingMode
 from prompt_toolkit.layout import Layout, HSplit, VSplit, Window, ConditionalContainer, DynamicContainer
-from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.widgets import TextArea, Label
 from prompt_toolkit.key_binding import KeyBindings
@@ -48,7 +46,6 @@ blim_style = Style.from_dict({
     'md.link': 'underline blue',
     'md.quote': 'magenta',
     'md.strike': 'fg:#888888',
-    'md.link': 'underline blue',
     
     # UI elements
     'status-warn': 'bg:#ff0000 #ffffff bold',
@@ -183,7 +180,7 @@ class BlimEditor:
         self._reload_dictionary()
         self.service = self.authenticate()
         
-        # UI & Layout (Order matters here to avoid duplicate definitions)
+        # UI & Layout 
         self._init_ui_components()
         self._init_layout()
         
@@ -222,7 +219,6 @@ class BlimEditor:
         return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"][key]
 
     def _reload_dictionary(self):
-        from spellchecker import SpellChecker
         self.spell = SpellChecker(language=self.lang)
         if os.path.exists(self.custom_dict_path):
             self.spell.word_frequency.load_text_file(self.custom_dict_path)
@@ -234,10 +230,17 @@ class BlimEditor:
         self.title_field = TextArea(height=1, prompt=lambda: self._t("title"), multiline=False, lexer=BlimLexer(self), focus_on_click=True)
         self.tags_field = TextArea(height=1, prompt=lambda: self._t("tags"), multiline=False, focus_on_click=True)
         
-        # Body Field defined ONCE here
-        self.body_field = TextArea(scrollbar=True, line_numbers=True, lexer=BlimLexer(self), wrap_lines=True, focus_on_click=True)
-        
-        # Command Field defined ONCE here with Ghost Icon logic
+        self.body_field = TextArea(
+            text="",
+            scrollbar=True,
+            line_numbers=True,
+            lexer=BlimLexer(self),
+            wrap_lines=True, 
+            focus_on_click=True,
+        )
+        self.body_field.window.soft_wrap = True
+        self.body_buffer = self.body_field.buffer  
+
         self.command_field = TextArea(
             height=1, 
             prompt=lambda: f"👻 {self._t('command')}" if self.ghost_mode_enabled else self._t("command"), 
@@ -268,30 +271,37 @@ class BlimEditor:
         self.header_row = DynamicContainer(lambda: self.header_bar if self.is_ui_visible() else Window(height=1))
         self.status_row = DynamicContainer(lambda: status_bar_view if self.is_ui_visible() else Window(height=1))
         
-        metadata_row = DynamicContainer(lambda: HSplit([self.title_field, self.tags_field, Window(height=1, char='-')]) 
-                                        if self.is_ui_visible() else Window(height=3))
+        metadata_row = DynamicContainer(lambda: HSplit([
+            self.title_field, 
+            self.tags_field, 
+            Window(height=1, char='-')
+        ], width=80) if self.is_ui_visible() else Window(height=3))
 
-        # Main Stack
+        # Main Stack 
         main_stack = HSplit([
-            ConditionalContainer(content=HSplit([metadata_row, self.body_field]), 
-                               filter=Condition(lambda: not self.show_help and not self.show_browser)),
+            ConditionalContainer(
+                content=HSplit([
+                    metadata_row, 
+                    self.body_field  
+                ]), 
+                filter=Condition(lambda: not self.show_help and not self.show_browser)
+            ),
             ConditionalContainer(content=self.help_field, filter=Condition(lambda: self.show_help)),
             ConditionalContainer(content=self.browser_field, filter=Condition(lambda: self.show_browser)),
-        ], width=80)
+        ], width=85) 
 
         # Container Assembly
-        # Build the centered container
         self.container = HSplit([
             # Header
             ConditionalContainer(
                 content=self.header_row,
                 filter=Condition(lambda: self.is_ui_visible())
             ),
-            # Centered Editor: [Flexible Spacer] [Editor] [Flexible Spacer]
+            # Centered Editor
             VSplit([
-                Window(), # Left spacer (takes up 50% of remaining space)
+                Window(), 
                 main_stack, 
-                Window(), # Right spacer (takes up 50% of remaining space)
+                Window(), 
             ]),
             # Command Bar
             DynamicContainer(lambda: warning_view if self.is_warning_mode else command_view),
@@ -306,7 +316,6 @@ class BlimEditor:
         if not self.ghost_mode_enabled:
             return True
         try:
-            # Hide UI only if user is actively focused in the body
             return not get_app().layout.has_focus(self.body_field)
         except:
             return True
@@ -344,7 +353,7 @@ class BlimEditor:
     def get_status_text(self):
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])['status']
         dirty = " *" if self.is_dirty() else ""
-        word_count = len(self.body_field.text.split())
+        word_count = len(self.body_buffer.text.split())
         result = []
 
         if word_count >= self.word_goal:
@@ -379,7 +388,7 @@ class BlimEditor:
         
         return result
 
-    def is_dirty(self): return self.body_field.text.strip() != self.last_saved_content.strip()
+    def is_dirty(self): return self.body_buffer.text.strip() != self.last_saved_content.strip()
 
     def apply_language(self, lang_code):
         self.lang = lang_code
@@ -449,7 +458,7 @@ class BlimEditor:
         buffer.text = ""
 
     def start_new_post(self):
-        self.title_field.text = self.body_field.text = self.tags_field.text = ""
+        self.title_field.text = self.body_buffer.text = self.tags_field.text = ""
         self.post_status = TRANSLATIONS[self.lang]["ui"]["new_post"]
         self.current_post_id = None
         get_app().layout.focus(self.body_field)
@@ -494,11 +503,11 @@ class BlimEditor:
             self.current_post_id, self.post_status = post['id'], post.get('status', 'LIVE')
             self.title_field.text = post.get('title', '')
             self.tags_field.text = ", ".join(post.get('labels', []))
-            self.body_field.text = self.last_saved_content = self.clean_html_for_editor(post.get('content', ''))
+            self.body_buffer.text = self.last_saved_content = self.clean_html_for_editor(post.get('content', ''))
         except: self.last_spell_report = self._t("load_error")
 
     def run_spellcheck(self):
-        text = self.body_field.text.strip()
+        text = self.body_buffer.text.strip()
         if not text:
             self.last_spell_report = self._t("empty_doc")
             return
@@ -552,7 +561,7 @@ class BlimEditor:
             self.last_spell_report = self._t("save_fail")
             return False
 
-        content_html = self._parse_markdown(self.body_field.text)
+        content_html = self._parse_markdown(self.body_buffer.text)
         labels = [t.strip() for t in self.tags_field.text.split(',') if t.strip()]
         body = {"title": self.title_field.text, "content": content_html, "labels": labels}
         
@@ -564,7 +573,7 @@ class BlimEditor:
                 res = self.service.posts().insert(blogId=self.blog_id, body=body, isDraft=is_draft).execute()
                 self.current_post_id = res['id']
             
-            self.last_saved_content = self.body_field.text
+            self.last_saved_content = self.body_buffer.text
             self.post_status = self._t("status_draft") if is_draft else self._t("status_live")
             self.last_spell_report = self._t("saved")
         except Exception as e:
@@ -693,7 +702,7 @@ class BlimEditor:
     def start_sprint(self, mins):
         self.sprint_time_left = int(mins) * 60
         self.sprint_active = True
-        self.sprint_start_words = len(self.body_field.text.split())
+        self.sprint_start_words = len(self.body_buffer.text.split())
         self.last_spell_report = self._t("sprint_start").format(mins=mins)
     
     def update_sprint(self):
@@ -701,19 +710,19 @@ class BlimEditor:
             self.sprint_time_left -= 1
             if self.sprint_time_left <= 0:
                 self.sprint_active = False
-                gain = max(0, len(self.body_field.text.split()) - self.sprint_start_words)
+                gain = max(0, len(self.body_buffer.text.split()) - self.sprint_start_words)
                 self.last_spell_report = self._t("sprint_done").format(gain=gain)
 
     def auto_save_recovery(self):
         try:
-            with open(self.recovery_path, 'w') as f: json.dump({"title": self.title_field.text, "body": self.body_field.text}, f)
+            with open(self.recovery_path, 'w') as f: json.dump({"title": self.title_field.text, "body": self.body_buffer.text}, f)
         except: pass
 
     def load_recovery(self):
         try:
             with open(self.recovery_path, 'r') as f:
                 d = json.load(f)
-                self.title_field.text, self.body_field.text = d['title'], d['body']
+                self.title_field.text, self.body_buffer.text = d['title'], d['body']
         except: pass
 
 def show_loading():
@@ -723,7 +732,7 @@ def show_loading():
 async def main():
     editor = BlimEditor()
     app = Application(
-        layout=Layout(editor.container, focused_element=editor.body_field), 
+        layout=Layout(editor.container, focused_element=editor.body_field.buffer), 
         key_bindings=editor.kb, 
         full_screen=True, 
         style=blim_style, 

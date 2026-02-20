@@ -1,49 +1,48 @@
-# Google API Files (Crucial for security)
+# ==========================================
+# Blim.py - Project Git Ignore
+# ==========================================
+
+# --- 1. Google API & Security (CRITICAL) ---
+# We ignore these everywhere to prevent accidental leaks
 client_secrets.json
 token.json
+config/client_secrets.json
+config/token.json
 
-# Local Configuration
+# --- 2. Blim Local Configuration ---
+# Your blog ID and local settings
 config.json
+config/config.json
+config/custom_dictionary.txt
 
-# Python environment/cache
-.pytest_cache/
-core/__pycache__
-tests/__pycache__/
+# --- 3. Local Recovery & Temps ---
+# Prevents personal writing drafts from being published
+.recovery_blim.tmp
+.blim_recovery.json
+config/.blim_recovery.json
+*.bak
+*.log
+logs/*.log
+
+# --- 4. Python Environment & Build ---
 __pycache__/
+core/__pycache__/
+tests/__pycache__/
 *.py[cod]
 *$py.class
 .venv/
 env/
 venv/
 .env
-
-# Logs
-*.log
-
-# Backup files
-*.bak
-
-# Recovery file
-.recovery_blim.tmp
-.blim_recovery.json
-
-# System files
-.coverage
-.DS_Store
-Thumbs.db
-
-# Ignore private configuration and dictionaries
-config/custom_dictionary.txt
-config/token.json
-config/client_secrets.json
-config/.blim_recovery.json
-
-# Ignore logs
-logs/*.log
-
-# Test coverage files
+.pytest_cache/
 .coverage
 htmlcov/
 nosetests.xml
 coverage.xml
 *.cover
+
+# --- 5. System & IDE Specific ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
