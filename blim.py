@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-
+import gc
 import os, sys, time, json, re, asyncio
 from prompt_toolkit import Application
 from prompt_toolkit.enums import EditingMode
@@ -154,17 +154,18 @@ class BlimEditor:
         self.browser_index = 0
         self.start_time = time.time()
 
-        # Dictionary & Spell Checker
+        # Dictionary & Spell Checker Setup
+        self.spell = None 
+        self.dictionary_loaded = False
         self.show_spelling_errors = False  
-        self._reload_dictionary()
+        
+        # Just ensure the directory exists for test mode, but DO NOT load anything
         if self.test_mode:
             os.makedirs(os.path.dirname(self.custom_dict_path), exist_ok=True)
             if not os.path.exists(self.custom_dict_path):
                 with open(self.custom_dict_path, 'w', encoding='utf-8') as f:
                     f.write("")
 
-        if os.path.exists(self.custom_dict_path):
-            self.spell.word_frequency.load_text_file(self.custom_dict_path)
         self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
         
         # Sprint & Ghost Mode
@@ -219,9 +220,17 @@ class BlimEditor:
         return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"][key]
 
     def _reload_dictionary(self):
+        self.spell = None
+        gc.collect()
+
+        # Load the main heavy dictionary
         self.spell = SpellChecker(language=self.lang)
+        
+        # Load your custom words here
         if os.path.exists(self.custom_dict_path):
             self.spell.word_frequency.load_text_file(self.custom_dict_path)
+            
+        self.dictionary_loaded = True
 
     def _init_ui_components(self):
         # UI Fields
@@ -258,7 +267,7 @@ class BlimEditor:
     def _init_layout(self):
         # Rows
         self.header_bar = VSplit([
-            Label(text=" v1.4.0 ", style='class:reverse-header'), 
+            Label(text=" v1.7.2 ", style='class:reverse-header'), #<-- Version Display
             self.header_label, 
             Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') 
         ], height=1)
@@ -618,6 +627,11 @@ class BlimEditor:
         def _(event):
             self.show_spelling_errors = not self.show_spelling_errors
             if self.show_spelling_errors:
+                # Load only if it's the first time
+                if not self.dictionary_loaded:
+                    self.last_spell_report = "Loading Dictionary..."
+                    event.app.invalidate()
+                    self._reload_dictionary() 
                 self.run_spellcheck() 
             else:
                 self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
@@ -743,10 +757,21 @@ async def main():
         ticks = 0
         while True:
             await asyncio.sleep(0.1) 
-            app.invalidate()
+            # 1. Update sprint logic if active
+            if editor.sprint_active:
+                editor.update_sprint()
+                app.invalidate() # Only force redraw if the timer is visible
+            
+            # 2. Only invalidate if the user has typed (to update word count/status)
+            elif editor.is_dirty():
+                app.invalidate()
+
             ticks += 1
-            if ticks % 10 == 0: editor.update_sprint()
-            if ticks >= 600: editor.auto_save_recovery(); ticks = 0
+            # 3. Every minute, run a cleanup and auto-save
+            if ticks >= 60:
+                editor.auto_save_recovery()
+                gc.collect() # Garbage collect Lexer fragments
+                ticks = 0
     
     app.create_background_task(refresh())
     await app.run_async()

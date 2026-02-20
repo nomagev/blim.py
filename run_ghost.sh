@@ -111,3 +111,41 @@ fi
 # --- 3. LAUNCH ---
 echo "🚀 Launching Ghost Test..."
 python3 "$GHOST_FILE"
+
+# --- 4. MEMORY SNAPSHOT ---
+echo "🚀 Launching Ghost Test..."
+# Run the test in the background
+python3 tests/ghost_test.py &
+PID=$!
+
+# Initialize variables
+PEAK_MEM=0
+
+# Monitor memory for up to 15 seconds while the process is alive
+for i in {1..15}; do
+    if ps -p $PID > /dev/null; then
+        # Capture current RSS in KB
+        CURRENT_MEM=$(ps -o rss= -p $PID)
+        if [ "$CURRENT_MEM" -gt "$PEAK_MEM" ]; then
+            PEAK_MEM=$CURRENT_MEM
+        fi
+        sleep 1
+    else
+        break
+    fi
+done
+
+# Wait for the background process to finish completely
+wait $PID
+
+echo "--------------------------------------"
+echo "✅ Ghost Test Finished."
+
+if [ "$PEAK_MEM" -gt 0 ]; then
+    # Convert KB to MB
+    FINAL_MB=$(echo "scale=2; $PEAK_MEM / 1024" | bc)
+    echo "📊 PEAK MEMORY USAGE: $FINAL_MB MB"
+else
+    echo "❌ Could not capture memory (Process exited too fast)."
+fi
+echo "--------------------------------------"
