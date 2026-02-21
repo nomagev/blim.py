@@ -27,12 +27,12 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.styles import Style
 from prompt_toolkit.application import get_app
 
-from spellchecker import SpellChecker
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google.auth.exceptions import TransportError
+# from spellchecker import SpellChecker #<-- Optional, only if you want spell checking
+# from google_auth_oauthlib.flow import InstalledAppFlow #<-- Loaded later on to reduce memory footprint
+# from googleapiclient.discovery import build #<-- Loaded later on to reduce memory footprint
+# from google.auth.transport.requests import Request #<-- Loaded later on to reduce memory footprint
+# from google.oauth2.credentials import Credentials #<-- Loaded later on to reduce memory footprint
+# from google.auth.exceptions import TransportError #<-- Loaded later on to reduce memory footprint
 
 from core.assets import get_banner, HELP_TEXT, TRANSLATIONS
 
@@ -87,11 +87,38 @@ class BlimLexer(Lexer):
     def lex_document(self, document: Document):
         def get_line(lineno):
             line_text = document.lines[lineno]
-            line_start_index = document.translate_row_col_to_index(lineno, 0)
             
+            # --- THE OPTIMIZED KILL-SWITCH ---
+            if not self.editor.show_spelling_errors or self.editor.spell is None:
+                # If it's a simple line (most lines), return it as one single object.
+                # This prevents the creation of thousands of fragment tuples in RAM.
+                if not any(char in line_text for char in ('#', '>', '*', '_', '`')):
+                    return [('', line_text)]
+                
+                # Otherwise, do the standard markdown processing
+                if line_text.startswith('#'): return [('class:md.header', line_text)]
+                if line_text.startswith('>'): return [('class:md.quote', line_text)]
+                
+                formatted_line = []
+                last_pos = 0
+                matches = []
+                for pattern, style in self.md_rules:
+                    for m in re.finditer(pattern, line_text):
+                        matches.append((m.start(), m.end(), style))
+                matches.sort()
+                for start, end, style in matches:
+                    if start > last_pos:
+                        formatted_line.append(('', line_text[last_pos:start]))
+                    formatted_line.append((style, line_text[start:end]))
+                    last_pos = end
+                if last_pos < len(line_text):
+                    formatted_line.append(('', line_text[last_pos:]))
+                return formatted_line
+
+            # --- NORMAL SPELLCHECK PATH (Only when Ctrl+D is ON) ---
+            line_start_index = document.translate_row_col_to_index(lineno, 0)
             if line_text.startswith('#'): return [('class:md.header', line_text)]
             if line_text.startswith('>'): return [('class:md.quote', line_text)]
-
             formatted_line = []
             last_pos = 0
             matches = []
@@ -99,14 +126,12 @@ class BlimLexer(Lexer):
                 for m in re.finditer(pattern, line_text):
                     matches.append((m.start(), m.end(), style))
             matches.sort()
-
             for start, end, style in matches:
                 if start > last_pos:
                     self._add_spellchecked_text(formatted_line, line_text[last_pos:start], 
                                                line_start_index + last_pos, document.cursor_position)
                 formatted_line.append((style, line_text[start:end]))
                 last_pos = end
-
             if last_pos < len(line_text):
                 self._add_spellchecked_text(formatted_line, line_text[last_pos:], 
                                            line_start_index + last_pos, document.cursor_position)
@@ -123,7 +148,7 @@ class BlimLexer(Lexer):
             if match.start() > last_pos:
                 fragments.append(('', text[last_pos:match.start()]))
             
-            is_unknown = word.lower() not in self.editor.spell
+            is_unknown = self.editor.spell is not None and word.lower() not in self.editor.spell
             is_being_typed = word_start <= cursor_pos <= word_end
 
             if self.editor.show_spelling_errors and is_unknown and not is_being_typed:
@@ -177,10 +202,13 @@ class BlimEditor:
         # Reading Speed
         self.reading_speed = 225
 
-        # Services
-        self._reload_dictionary()
-        self.service = self.authenticate()
-        
+        # Authentication Services
+        # self.service = self.authenticate()
+        self.service = None
+        self.is_offline = False
+        self.posts_list = []
+        self.browser_index = 0
+
         # UI & Layout 
         self._init_ui_components()
         self._init_layout()
@@ -220,6 +248,8 @@ class BlimEditor:
         return TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"][key]
 
     def _reload_dictionary(self):
+        from spellchecker import SpellChecker #<-- Import here to reduce initial load time
+        import gc
         self.spell = None
         gc.collect()
 
@@ -267,7 +297,7 @@ class BlimEditor:
     def _init_layout(self):
         # Rows
         self.header_bar = VSplit([
-            Label(text=" v1.7.2 ", style='class:reverse-header'), #<-- Version Display
+            Label(text=" v1.7.3 ", style='class:reverse-header'), #<-- Version Display
             self.header_label, 
             Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') 
         ], height=1)
@@ -330,6 +360,11 @@ class BlimEditor:
             return True
     
     def authenticate(self):
+        from googleapiclient.discovery import build #<-- Import here to reduce initial load time
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+        from google.auth.exceptions import TransportError
         if self.test_mode:
             self.is_offline = True
             return None
@@ -403,12 +438,16 @@ class BlimEditor:
         self.lang = lang_code
         t = TRANSLATIONS[self.lang]["ui"]
 
+        # Only reload if the user actually has the dictionary turned on!
+        if self.dictionary_loaded:
+            self._reload_dictionary()
+
         if self.post_status in ["[NEW]", "[NUEVO]", "NEW"]:
             self.post_status = t["new_post"]
 
         if self.show_browser: self.render_browser()
         self.help_field.text = HELP_TEXT.get(self.lang, HELP_TEXT["en"]).strip()
-        self._reload_dictionary()
+            
         self.last_spell_report = t["lang_feedback"]
     
     def spell_check(self):
@@ -476,7 +515,25 @@ class BlimEditor:
         self.start_new_post()
         self.last_saved_content = ""
 
+    def toggle_browser(self):
+        self.show_browser = not self.show_browser
+        self.show_help = False
+        
+        if self.show_browser:
+            self.fetch_recent_posts()
+            get_app().layout.focus(self.browser_field)
+        else:
+            # --- MEMORY CLEANUP START ---
+            self.posts_list = []      # Clear the list of post metadata
+            self.browser_field.buffer.reset(Document(text=""))  # Clear the browser text area
+            import gc
+            gc.collect()              # Force immediate cleanup of UI fragments
+            # --- MEMORY CLEANUP END ---
+            get_app().layout.focus(self.body_field)
+
     def fetch_recent_posts(self):
+        if self.service is None and not self.is_offline:
+            self.service = self.authenticate()
         if self.is_offline or not self.service: return
         try:
             posts_data = self.service.posts().list(blogId=self.blog_id, maxResults=20, status=['LIVE', 'DRAFT'], view='AUTHOR').execute()
@@ -489,12 +546,20 @@ class BlimEditor:
         t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]
         width = 76
         
-        lines = [t["fetching"], " ╔" + "═"*(width-2) + "╗", f" ║{t['browser_title'].center(width-2)}║", " ╠" + "═"*(width-2) + "╣"]
+        # Header (4 lines)
+        lines = [
+            t["fetching"], 
+            " ╔" + "═"*(width-2) + "╗", 
+            f" ║{t['browser_title'].center(width-2)}║", 
+            " ╠" + "═"*(width-2) + "╣"
+        ]
         
+        # Show up to 12 posts
         for i, post in enumerate(self.posts_list[:12]):
             prefix = " › " if i == self.browser_index else "   "
-            display_title = post['title'][:60].ljust(60)
-            status_char = post['status'][0].upper()
+            title = post.get('title', post.get('name', 'Untitled'))
+            display_title = title[:60].ljust(60)
+            status_char = post.get('status', 'D')[0].upper()
             content = f" {prefix}[{status_char}] {display_title}".ljust(width-2)
             lines.append(f" ║{content}║")
             
@@ -504,15 +569,36 @@ class BlimEditor:
         lines.append(" ╚" + "═"*(width-2) + "╝")
         lines.append(t["browser_hint"].center(width)) 
         
-        self.browser_field.text = "\n".join(lines)
+        # --- MEMORY & SCROLL FIX ---
+        # .reset() clears the render cache to prevent 165MB spikes
+        self.browser_field.buffer.reset(Document(text="\n".join(lines)))
+        
+        # This fixes the "Up Scroll" bug by forcing the view to follow selection
+        target_line = 4 + self.browser_index
+        new_pos = self.browser_field.buffer.document.translate_row_col_to_index(target_line, 0)
+        self.browser_field.buffer.cursor_position = new_pos
 
     def fetch_and_load(self, post_id):
+        if self.service is None and not self.is_offline:
+            self.service = self.authenticate()
+        if self.is_offline or not self.service: return
         try:
             post = self.service.posts().get(blogId=self.blog_id, postId=post_id, view='AUTHOR').execute()
             self.current_post_id, self.post_status = post['id'], post.get('status', 'LIVE')
-            self.title_field.text = post.get('title', '')
-            self.tags_field.text = ", ".join(post.get('labels', []))
-            self.body_buffer.text = self.last_saved_content = self.clean_html_for_editor(post.get('content', ''))
+            
+            # Use reset() for all fields to ensure cache clearing
+            self.title_field.buffer.reset(Document(text=post.get('title', '')))
+            self.tags_field.buffer.reset(Document(text=", ".join(post.get('labels', []))))
+            
+            content = self.clean_html_for_editor(post.get('content', ''))
+            self.last_saved_content = content
+            
+            # This is the big one: clears the body_field render cache
+            self.body_field.buffer.reset(Document(text=content))
+            
+            import gc
+            gc.collect()  # Immediate cleanup after loading a post
+            
         except: self.last_spell_report = self._t("load_error")
 
     def run_spellcheck(self):
@@ -566,6 +652,8 @@ class BlimEditor:
         return "".join(processed_blocks)
 
     def save_post(self, is_draft=True):
+        if self.service is None and not self.is_offline:
+            self.service = self.authenticate()
         if self.is_offline or not self.service:
             self.last_spell_report = self._t("save_fail")
             return False
@@ -609,19 +697,13 @@ class BlimEditor:
         
         @kb.add('c-o')
         def _(event):
-            self.show_browser = not self.show_browser
-            self.show_help = False
-            if self.show_browser:
-                self.fetch_recent_posts()
-                get_app().layout.focus(self.browser_field)
-            else:
-                get_app().layout.focus(self.body_field)
+            self.toggle_browser()
 
-        @kb.add('tab')
-        def _(event): event.app.layout.focus_next()
+        # @kb.add('tab')
+        # def _(event): event.app.layout.focus_next()
         
-        @kb.add('s-tab')
-        def _(event): event.app.layout.focus_previous()
+        # @kb.add('s-tab')
+        # def _(event): event.app.layout.focus_previous()
 
         @kb.add('c-d')
         def _(event):
@@ -634,6 +716,15 @@ class BlimEditor:
                     self._reload_dictionary() 
                 self.run_spellcheck() 
             else:
+                # --- MEMORY OPTIMIZATION START ---
+                self.spell = None            # Remove the heavy object
+                self.dictionary_loaded = False # Allow fresh reload later
+                current_content = self.body_field.text  # Store current text
+                self.body_field.buffer.reset(Document(text=current_content))  # Reset buffer to clear lexer cache
+
+                import gc
+                gc.collect()                 # Force immediate cleanup
+                # --- MEMORY OPTIMIZATION END ---
                 self.last_spell_report = self._t("ready").format(lang=self.lang.upper())
             event.app.invalidate()
         
@@ -700,11 +791,26 @@ class BlimEditor:
                 buff.insert_text("* ")
 
         # Navigation
+        
         @kb.add('up', filter=Condition(lambda: self.show_browser))
-        def _(event): self.browser_index = max(0, self.browser_index - 1); self.render_browser()
+        def _(event):
+            limit = min(len(self.posts_list), 12)
+            if limit > 0:
+                self.browser_index = (self.browser_index - 1) % limit
+                self.render_browser()
+                import gc
+                gc.collect()
         
         @kb.add('down', filter=Condition(lambda: self.show_browser))
-        def _(event): self.browser_index = min(len(self.posts_list)-1, self.browser_index + 1); self.render_browser()
+        def _(event):
+            # Dynamically wrap based on the actual number of posts shown (12)
+            limit = min(len(self.posts_list), 12)
+            if limit > 0:
+                self.browser_index = (self.browser_index + 1) % limit
+                self.render_browser()
+                # Incinerate fragments immediately during scrolling
+                import gc
+                gc.collect()
         
         @kb.add('enter', filter=Condition(lambda: self.show_browser))
         def _(event): 
@@ -712,6 +818,44 @@ class BlimEditor:
                 self.fetch_and_load(self.posts_list[self.browser_index]['id'])
                 self.show_browser = False
                 get_app().layout.focus(self.body_field)
+
+        # --- 1. AREA NAVIGATION (TAB) ---
+        @kb.add('tab')
+        def _(event):
+            # focus_next() moves Title -> Tags -> Body
+            event.app.layout.focus_next()
+            import gc
+            gc.collect(0)
+
+        # --- 2. BACKWARD NAVIGATION (S-TAB) ---
+        @kb.add('s-tab')
+        def _(event):
+            # focus_previous() moves Body -> Tags -> Title
+            event.app.layout.focus_previous()
+            import gc
+            gc.collect(0)
+
+        # --- 2. TEXT SCROLLING (Arrows/Page) ---
+        @kb.add('up', filter=Condition(lambda: not self.show_browser))
+        @kb.add('down', filter=Condition(lambda: not self.show_browser))
+        @kb.add('pageup')
+        @kb.add('pagedown')
+        def _(event):
+            key = event.key_sequence[0].key
+            
+            # Execute the actual movement
+            if key == 'pageup': 
+                event.current_buffer.cursor_up(count=event.arg)
+            elif key == 'pagedown': 
+                event.current_buffer.cursor_down(count=event.arg)
+            elif key == 'up': 
+                event.current_buffer.cursor_up()
+            elif key == 'down': 
+                event.current_buffer.cursor_down()
+            
+            # Clean up memory fragments created by the Lexer during scroll
+            import gc
+            gc.collect(0)
 
     def start_sprint(self, mins):
         self.sprint_time_left = int(mins) * 60
@@ -756,7 +900,7 @@ async def main():
     async def refresh():
         ticks = 0
         while True:
-            await asyncio.sleep(0.1) 
+            await asyncio.sleep(1.0) 
             # 1. Update sprint logic if active
             if editor.sprint_active:
                 editor.update_sprint()
@@ -767,8 +911,8 @@ async def main():
                 app.invalidate()
 
             ticks += 1
-            # 3. Every minute, run a cleanup and auto-save
-            if ticks >= 60:
+            # 3. Every 30 seconds, run a cleanup and auto-save
+            if ticks >= 30:
                 editor.auto_save_recovery()
                 gc.collect() # Garbage collect Lexer fragments
                 ticks = 0
