@@ -1,7 +1,7 @@
 # BLIM.PY
 
 ![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)
-![Version: 1.7.2](https://img.shields.io/badge/Version-1.7.2-green)
+![Version: 1.7.5](https://img.shields.io/badge/Version-1.7.5-green)
 ![Python: 3.10+](https://img.shields.io/badge/Python-3.10+-yellow)
 [![Python Tests](https://github.com/nomagev/blim.py/actions/workflows/python-test.yml/badge.svg)](https://github.com/nomagev/blim.py/actions/workflows/python-test.yml)
 

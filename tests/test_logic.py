@@ -30,6 +30,8 @@ def test_robot_point_4_commands(robot, tmp_path):
     """Scenario: User adds a custom word via :add command."""
     fake_dict = tmp_path / "robot_dict.txt"
     robot.custom_dict_path = str(fake_dict)
+
+    robot._reload_dictionary()  # Ensure it starts empty
     test_word = "blimpy"
     
     # We must mock the buffer object that handle_normal_input expects

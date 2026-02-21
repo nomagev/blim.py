@@ -104,7 +104,7 @@ HELP_TEXT = {
 
 # Version info
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 
 # Dictionary for UI labels
 TRANSLATIONS = {

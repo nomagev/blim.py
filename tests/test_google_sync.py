@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from blim import BlimEditor  # This imports your class
 
-@patch('blim.build')
+@patch('googleapiclient.discovery.build')
 def test_save_post_success(mock_build):
     # 1. SETUP
     mock_service = MagicMock()
@@ -34,7 +34,7 @@ def test_save_post_success(mock_build):
     expected_msg = editor._t("saved") 
     assert expected_msg in editor.last_spell_report
 
-@patch('blim.build')
+@patch('googleapiclient.discovery.build')
 def test_save_post_failure(mock_build):
     editor = BlimEditor(test_mode=True)  # Use test mode to avoid real API calls
     editor.is_offline = False
