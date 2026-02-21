@@ -35,6 +35,7 @@ HELP_TEXT = {
     [:new]           › Clear screen for a fresh start
     [:speed NN]      › Set reading speed (words per minute)
     [:add WORD]      › Add WORD to custom dictionary
+    [:addall]        › Add all underlined words to dictionary
     [Ctrl+T]         › Toggle Ghost Mode (Hide UI while writing)
     [Ctrl+D]         › Run Spellcheck / Dictionary Check
 
@@ -77,6 +78,7 @@ HELP_TEXT = {
     [:new]           › Limpiar pantalla (Nueva entrada)
     [:speed NN]      › Establecer velocidad de lectura (palabras por minuto)
     [:add PALABRA]   › Agregar PALABRA al diccionario personalizado
+    [:addall]        › Agregar todas las palabras subrayadas al diccionario
     [Ctrl+T]         › Modo Fantasma (Ocultar interfaz al escribir)
     [Ctrl+D]         › Verificar Ortografía (Diccionario)
 
