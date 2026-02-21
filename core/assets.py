@@ -100,6 +100,10 @@ HELP_TEXT = {
 """
 }
 
+# Version info
+
+VERSION = "1.7.4"
+
 # Dictionary for UI labels
 TRANSLATIONS = {
     "en": {
@@ -136,6 +140,9 @@ TRANSLATIONS = {
             'speed_set': "Reading speed: {speed} wpm",
             'help_btn': "Help",
             'added_to_dict': "Added '{word}' to dictionary.",
+            'addall_success': "All {count} words added to dictionary.",
+            'addall_none': "No words to add to dictionary.",
+            'addall_no_spell': "Dictionary not active. Press Ctrl+D first",
         },
         "messages": {
             "offline": "⚠️ OFFLINE MODE: Google unreachable.",
@@ -190,6 +197,9 @@ TRANSLATIONS = {
             'speed_set': "Velocidad de lectura: {speed} ppm",
             'help_btn': "Ayuda",
             'added_to_dict': "'{word}' añadida al diccionario.",
+            'addall_success': "Se agregaron {count} palabras al diccionario.",
+            'addall_none': "No hay palabras que agregar al diccionario.",
+            'addall_no_spell': "El diccionario no está activo. Presiona Ctrl+D primero.",
         },
         "messages": {
             "offline": "⚠️ MODO OFFLINE: Google inaccesible.",

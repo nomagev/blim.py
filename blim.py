@@ -14,7 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-import gc
+
+
 import os, sys, time, json, re, asyncio
 from prompt_toolkit import Application
 from prompt_toolkit.enums import EditingMode
@@ -27,14 +28,8 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.styles import Style
 from prompt_toolkit.application import get_app
 
-# from spellchecker import SpellChecker #<-- Optional, only if you want spell checking
-# from google_auth_oauthlib.flow import InstalledAppFlow #<-- Loaded later on to reduce memory footprint
-# from googleapiclient.discovery import build #<-- Loaded later on to reduce memory footprint
-# from google.auth.transport.requests import Request #<-- Loaded later on to reduce memory footprint
-# from google.oauth2.credentials import Credentials #<-- Loaded later on to reduce memory footprint
-# from google.auth.exceptions import TransportError #<-- Loaded later on to reduce memory footprint
-
-from core.assets import get_banner, HELP_TEXT, TRANSLATIONS
+# Local imports from core/assets.py
+from core.assets import get_banner, HELP_TEXT, TRANSLATIONS, VERSION
 
 # --- Style Definition ---
 blim_style = Style.from_dict({
@@ -180,6 +175,7 @@ class BlimEditor:
         self.start_time = time.time()
 
         # Dictionary & Spell Checker Setup
+        self.custom_words = set()
         self.spell = None 
         self.dictionary_loaded = False
         self.show_spelling_errors = False  
@@ -297,7 +293,7 @@ class BlimEditor:
     def _init_layout(self):
         # Rows
         self.header_bar = VSplit([
-            Label(text=" v1.7.3 ", style='class:reverse-header'), #<-- Version Display
+            Label(text=f" v{VERSION} ", style='class:reverse-header'), #<-- Version Display
             self.header_label, 
             Label(text=f" [F1] {self._t('help_btn')} ", style='class:reverse-header') 
         ], height=1)
@@ -455,20 +451,27 @@ class BlimEditor:
 
     def handle_normal_input(self, buffer):
         cmd = buffer.text.strip().lower()
+        
         if not cmd:
             get_app().layout.focus(self.body_field); return
 
         if cmd == ':new': self.start_new_post()
+        
         elif cmd == ':spa': self.apply_language('es')
+        
         elif cmd == ':eng': self.apply_language('en')
+        
         elif cmd in [':q', ':exit']:
             if not self.is_dirty(): get_app().exit()
             else:
                 self.is_warning_mode = True
                 self.pending_action = "quit"
                 get_app().layout.focus(self.warning_field)
+        
         elif cmd == ':help': self.show_help, self.show_browser = True, False
+        
         elif cmd == ':restore': self.load_recovery()
+        
         elif cmd.startswith(':sprint'):
             parts = cmd.split()
             try:
@@ -477,22 +480,58 @@ class BlimEditor:
             except ValueError:
                 self.start_sprint(25)
             get_app().layout.focus(self.body_field) 
+        
         elif cmd.isdigit(): 
             self.fetch_and_load(cmd)
             get_app().layout.focus(self.body_field)
+        
         elif cmd.startswith(':speed'):
             parts = cmd.split()
             if len(parts) > 1 and parts[1].isdigit():
                 self.reading_speed = int(parts[1])
                 self.last_spell_report = self._t("speed_set").format(speed=self.reading_speed)
+        
         elif cmd.startswith(':add '):
             word_to_add = cmd.replace(':add ', '').strip().lower()
             if word_to_add:
                 with open(self.custom_dict_path, 'a', encoding='utf-8') as f:
                     f.write(word_to_add + "\n")
                 self.spell.word_frequency.load_words([word_to_add])
-                self.last_spell_report = f"'{word_to_add}' {self._t('added_to_dict')}"
+                self.last_spell_report = self._t('added_to_dict').format(word=word_to_add)
                 self.spell_check() 
+        
+        elif cmd == ':addall':
+            t = TRANSLATIONS.get(self.lang, TRANSLATIONS['en'])["ui"]
+            
+            if self.spell:
+                # 1. Memory-efficient word extraction (only letters)
+                # We use a set to automatically handle duplicates in the text
+                all_words = set(re.findall(r'\b[a-zA-ZáéíóúÁÉÍÓÚñÑ]+\b', self.body_field.text))
+                
+                # 2. Find which ones the spellchecker doesn't recognize
+                unknown = self.spell.unknown(all_words)
+                
+                if unknown:
+                    # 3. Load into active session
+                    self.spell.word_frequency.load_words(unknown)
+                    
+                    # 4. Update the internal set and save to disk
+                    self.custom_words.update(unknown)
+                    with open(self.custom_dict_path, 'a', encoding='utf-8') as f:
+                        for word in unknown:
+                            f.write(word + "\n")
+                    
+                    self.last_spell_report = t["addall_success"].format(count=len(unknown))
+                    
+                    # 5. MEMORY OPTIMIZATION: Clean up temporary sets immediately
+                    del all_words
+                    del unknown
+                    import gc
+                    gc.collect(0) 
+                else:
+                    self.last_spell_report = t["addall_none"]
+            else:
+                self.last_spell_report = t["addall_no_spell"]
 
         buffer.text = ""
 
@@ -914,6 +953,7 @@ async def main():
             # 3. Every 30 seconds, run a cleanup and auto-save
             if ticks >= 30:
                 editor.auto_save_recovery()
+                import gc
                 gc.collect() # Garbage collect Lexer fragments
                 ticks = 0
     
