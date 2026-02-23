@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from blim import BlimEditor
 
 @pytest.fixture
@@ -83,3 +83,32 @@ def test_robot_recovery_loading(robot, tmp_path):
     # 3. Validation: Verify the fields updated
     assert robot.title_field.text == "Recovered Title"
     assert robot.body_field.text == "Recovered Body"
+
+def test_publish_confirmation_logic(robot):
+    """Verify that Ctrl+P requires a 'y' to actually call save via localization."""
+    # Mock the save_post method so we don't actually hit the internet
+    robot.save_post = MagicMock()
+    
+    with patch('blim.get_app') as mock_get_app:
+        # 1. Trigger the "Waiting" state (Simulating what Ctrl+P does)
+        robot.waiting_for_publish_confirm = True
+        robot.last_spell_report = robot._t("confirm_publish")
+        
+        # 2. Simulate user typing 'n' (Cancel)
+        mock_buffer = MagicMock()
+        mock_buffer.text = "n"
+        robot.handle_normal_input(mock_buffer)
+        
+        # Verify: Save NOT called, flag is reset, and "cancelled" message is shown
+        assert not robot.save_post.called
+        assert robot.waiting_for_publish_confirm is False
+        assert robot.last_spell_report == robot._t("publish_cancelled")
+
+        # 3. Trigger state again for the 'Yes' test
+        robot.waiting_for_publish_confirm = True
+        mock_buffer.text = "y"
+        robot.handle_normal_input(mock_buffer)
+        
+        # Verify: Save WAS called and flag is reset
+        assert robot.save_post.called
+        assert robot.waiting_for_publish_confirm is False

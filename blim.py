@@ -162,6 +162,7 @@ class BlimEditor:
         self.test_mode = test_mode 
         self._load_paths()
         self._load_config()
+        self.waiting_for_publish_confirm = False
         
         # State
         self.current_post_id = None
@@ -452,6 +453,18 @@ class BlimEditor:
     def handle_normal_input(self, buffer):
         cmd = buffer.text.strip().lower()
         
+        if self.waiting_for_publish_confirm:
+            if cmd == 'y':
+                self.save_post(is_draft=False)
+            else:
+                self.last_spell_report = self._t("publish_cancelled")
+            
+            self.waiting_for_publish_confirm = False # Reset state
+            buffer.text = ""
+            get_app().layout.focus(self.body_field)
+            return
+
+        # 2. Handle standard commands
         if not cmd:
             get_app().layout.focus(self.body_field); return
 
@@ -774,7 +787,14 @@ class BlimEditor:
         def _(event): self.save_post(is_draft=True)
         
         @kb.add('c-p')
-        def _(event): self.save_post(is_draft=False)
+        def _(event):
+            self.waiting_for_publish_confirm = True
+            self.command_field.text = ""
+            self.last_spell_report = self._t("confirm_publish")
+            event.app.layout.focus(self.command_field)
+
+        # @kb.add('c-p')
+        # def _(event): self.save_post(is_draft=False)
         
         @kb.add('c-t')
         def _(event):

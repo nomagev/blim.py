@@ -13,6 +13,10 @@ def get_banner():
     except Exception:
         return "BLIM.PY" # Fallback if file is missing
 
+# Version info
+
+VERSION = "1.7.6" #<-- Change this to see correct version in UI
+
 # Dictionary for multi-language Help
 HELP_TEXT = {
     "en": """
@@ -102,10 +106,6 @@ HELP_TEXT = {
 """
 }
 
-# Version info
-
-VERSION = "1.7.5"
-
 # Dictionary for UI labels
 TRANSLATIONS = {
     "en": {
@@ -145,6 +145,8 @@ TRANSLATIONS = {
             'addall_success': "All {count} words added to dictionary.",
             'addall_none': "No words to add to dictionary.",
             'addall_no_spell': "Dictionary not active. Press Ctrl+D first",
+            'confirm_publish': "CONFIRM PUBLISH (y/n)",
+            'publish_cancelled': "Publication cancelled",
         },
         "messages": {
             "offline": "⚠️ OFFLINE MODE: Google unreachable.",
@@ -202,6 +204,8 @@ TRANSLATIONS = {
             'addall_success': "Se agregaron {count} palabras al diccionario.",
             'addall_none': "No hay palabras que agregar al diccionario.",
             'addall_no_spell': "El diccionario no está activo. Presiona Ctrl+D primero.",
+            'confirm_publish': "¿CONFIRMAR PUBLICACIÓN? (y/n)",
+            'publish_cancelled': "Publicación cancelada",
         },
         "messages": {
             "offline": "⚠️ MODO OFFLINE: Google inaccesible.",
